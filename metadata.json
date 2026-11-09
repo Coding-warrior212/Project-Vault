@@ -1,0 +1,6 @@
+{
+  "name": "ProjectVault — AI-Powered Project Continuity & Handover",
+  "description": "Knowledge that stays. Projects that move. Connect project sources, reconstruct institutional knowledge, verify evidence, review claims, and generate reliable project handovers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

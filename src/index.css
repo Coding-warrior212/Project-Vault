@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-vault-navy: #25245F;
+  --color-vault-navy-dark: #1B1A48;
+  --color-vault-cream: #FFF4E3;
+  --color-vault-orange: #F36B3F;
+  --color-vault-turquoise: #55C7C2;
+  --color-vault-pink: #F8B4C0;
+  --color-vault-gold: #E5B25D;
+}
+
+/* Custom scrollbars and refined utilities */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(37, 36, 95, 0.2);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(37, 36, 95, 0.35);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 244, 227, 0.15);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 244, 227, 0.25);
+}
+
+/* Refined Neo-Brutalist & Soft 3D Design Tokens */
+.neo-box-sm {
+  box-shadow: 2px 2px 0px #25245F;
+}
+.neo-box {
+  box-shadow: 3px 3px 0px #25245F;
+}
+.neo-box-lg {
+  box-shadow: 4px 4px 0px #25245F;
+}
+.neo-box-orange {
+  box-shadow: 3px 3px 0px #F36B3F;
+}
+.neo-box-turquoise {
+  box-shadow: 3px 3px 0px #55C7C2;
+}
+
+.dark .neo-box-sm {
+  box-shadow: 2px 2px 0px rgba(85, 199, 194, 0.45);
+}
+.dark .neo-box {
+  box-shadow: 3px 3px 0px rgba(85, 199, 194, 0.45);
+}
+.dark .neo-box-lg {
+  box-shadow: 4px 4px 0px rgba(85, 199, 194, 0.45);
+}
+.dark .neo-box-orange {
+  box-shadow: 3px 3px 0px rgba(243, 107, 63, 0.55);
+}
+.dark .neo-box-turquoise {
+  box-shadow: 3px 3px 0px rgba(85, 199, 194, 0.6);
+}
+
+/* Soft 3D Dimensional Lighting */
+.soft-3d-clay {
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.8), inset 0 -2px 4px rgba(37, 36, 95, 0.08), 0 8px 24px -4px rgba(37, 36, 95, 0.08);
+}
+.dark .soft-3d-clay {
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.12), inset 0 -2px 4px rgba(0, 0, 0, 0.35), 0 8px 24px -4px rgba(10, 9, 30, 0.45);
+}
+
+.soft-3d-pill {
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7), inset 0 -1.5px 2px rgba(37, 36, 95, 0.12), 0 2px 6px rgba(37, 36, 95, 0.08);
+}
+.dark .soft-3d-pill {
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15), inset 0 -1.5px 2px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.soft-3d-btn {
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.3), inset 0 -2px 3px rgba(0, 0, 0, 0.2), 2px 2px 0px #25245F;
+}
+.dark .soft-3d-btn {
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.25), inset 0 -2px 3px rgba(0, 0, 0, 0.35), 2px 2px 0px rgba(85, 199, 194, 0.5);
+}
+
