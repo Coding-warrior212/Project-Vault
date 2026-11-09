@@ -87,14 +87,19 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
     evidence: false,
   });
 
+  const [approvalError, setApprovalError] = React.useState<string | null>(null);
+
   const [isApproved, setIsApproved] = React.useState<boolean>(() => {
-    return localStorage.getItem('projectvault_handover_approved') === 'true';
+    const persistedApproved = localStorage.getItem('projectvault_handover_approved') === 'true';
+    const persistedApprover = localStorage.getItem('projectvault_handover_approver') || '';
+    return persistedApproved && persistedApprover.trim().length > 0;
   });
 
   // Handle changes that invalidate prior approval
   const handleNoteChange = (setter: React.Dispatch<React.SetStateAction<string>>, storageKey: string, val: string) => {
     setter(val);
     localStorage.setItem(storageKey, val);
+    setApprovalError(null);
     setIsApproved(false);
     localStorage.setItem('projectvault_handover_approved', 'false');
   };
@@ -104,6 +109,7 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
       const next = { ...prev, [key]: !prev[key] };
       return next;
     });
+    setApprovalError(null);
     setIsApproved(false);
     localStorage.setItem('projectvault_handover_approved', 'false');
   };
@@ -111,7 +117,16 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
   const allChecklistItemsChecked = Object.values(checklist).every(Boolean);
 
   const handleApproveHandover = () => {
-    if (!allChecklistItemsChecked) return;
+    const trimmedName = approverName.trim();
+    if (!trimmedName) {
+      setApprovalError('Please enter the Lead Reviewer / Approver Name before signing off.');
+      return;
+    }
+    if (!allChecklistItemsChecked) {
+      setApprovalError('Please complete all 5 pre-export checklist items before signing off.');
+      return;
+    }
+    setApprovalError(null);
     setIsApproved(true);
     localStorage.setItem('projectvault_handover_approved', 'true');
   };
@@ -128,12 +143,15 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
 
   const verificationPercentage = claims.length > 0 ? Math.round((verifiedClaims.length / claims.length) * 100) : 0;
 
+  const effectiveApproved = isApproved && approverName.trim().length > 0;
+  const effectiveApprover = approverName.trim() || 'Pending Signoff';
+
   // Generate Markdown Handover Content
   const generatedMarkdown = `# ${HANDOVER_TEMPLATE.title}
 Workspace: ${currentWorkspace.name} (${currentWorkspace.code})
 Version: ${HANDOVER_TEMPLATE.version}
 Author/Lead Reviewer: ${approverName || 'ProjectVault AI Continuity Engine'}
-Approval Status: ${isApproved ? 'APPROVED & SIGNED OFF' : 'PENDING HUMAN APPROVAL'}
+Approval Status: ${effectiveApproved ? 'APPROVED & SIGNED OFF' : 'PENDING HUMAN APPROVAL'}
 Integrity Status: ${verificationPercentage}% Verified (${verifiedClaims.length}/${claims.length} claims)
 Generated At: ${new Date().toLocaleString()}
 
@@ -151,10 +169,10 @@ ${finalComment ? `**Final Reviewer Comment:**\n> ${finalComment}\n` : ''}
 - **Unverified Claims (Pending):** ${unverifiedClaims.length}
 - **Flagged Claims:** ${flaggedClaims.length}
 - **Rejected Claims:** ${rejectedClaims.length}
-- **Conflicted Claims:** ${conflictedClaims.length}
-- **Open Conflicts:** ${openConflicts.length}
-- **Missing Information Findings:** ${openMissingInfo.length}
-- **Unresolved Questions:** ${openQuestions.length}
+- **Conflicted Claim Records:** ${conflictedClaims.length}
+- **Open Conflict Findings:** ${openConflicts.length}
+- **Open Missing Information Findings:** ${openMissingInfo.length}
+- **Open Questions:** ${openQuestions.length}
 - **Connected Supporting Sources:** ${sources.length}
 
 ---
@@ -283,7 +301,7 @@ ${
 }
 
 ---
-*End of ProjectVault Handover Dossier. Approved by: ${approverName || 'Pending Signoff'} (${isApproved ? 'Verified' : 'Unapproved'})*
+*End of ProjectVault Handover Dossier. Approved by: ${effectiveApprover} (${effectiveApproved ? 'Verified' : 'Unapproved'})*
 `;
 
   const handleCopy = () => {
@@ -306,9 +324,9 @@ ${
             </span>
             <span className="text-white/40">·</span>
             <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
-              isApproved ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+              effectiveApproved ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
             }`}>
-              {isApproved ? '✓ HANDOVER APPROVED' : '⚠ APPROVAL PENDING'}
+              {effectiveApproved ? '✓ HANDOVER APPROVED' : '⚠ APPROVAL PENDING'}
             </span>
           </div>
           <h2 className="text-xl font-bold text-white">
@@ -321,14 +339,14 @@ ${
           <div className="pt-2 flex items-center gap-3">
             <button
               onClick={() => {
-                if (isApproved) {
+                if (effectiveApproved) {
                   setShowExportModal(true);
                 } else {
-                  alert('Please complete the Pre-Export Approval Checklist below before generating the handover package.');
+                  alert('Please enter a Lead Reviewer Name and complete the Pre-Export Approval Checklist before generating the handover package.');
                 }
               }}
               className={`px-4 py-2.5 text-xs font-bold rounded-lg border-2 transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-                isApproved
+                effectiveApproved
                   ? 'text-white bg-[#F36B3F] hover:bg-[#E0572C] border-[#F36B3F] shadow-[3px_3px_0px_#FFF4E3] dark:shadow-[3px_3px_0px_#25245F]'
                   : 'text-neutral-300 bg-neutral-700/50 border-neutral-600 cursor-not-allowed opacity-70'
               }`}
@@ -336,9 +354,9 @@ ${
               <Download className="w-4 h-4" />
               <span>Generate & Export Handover Package</span>
             </button>
-            {!isApproved && (
+            {!effectiveApproved && (
               <span className="text-[11px] text-amber-300/90 italic">
-                (Complete checklist & sign off below to unlock export)
+                (Complete checklist & enter reviewer name to unlock export)
               </span>
             )}
           </div>
@@ -424,7 +442,7 @@ ${
             className="p-3 bg-orange-50/70 dark:bg-orange-950/20 rounded-lg border-2 border-orange-200 dark:border-orange-900/40 text-xs cursor-pointer hover:bg-orange-100/60 transition-all"
           >
             <div className="flex items-center justify-between">
-              <span className="text-[#F36B3F] block text-[10px] uppercase font-bold">Open Conflicts</span>
+              <span className="text-[#F36B3F] block text-[10px] uppercase font-bold">Open Conflict Findings</span>
               <ExternalLink className="w-3.5 h-3.5 text-[#F36B3F]" />
             </div>
             <span className="text-xl font-bold font-mono text-[#F36B3F] tabular-nums">
@@ -574,17 +592,24 @@ ${
           ))}
         </div>
 
+        {approvalError && (
+          <div className="p-3 bg-rose-50 dark:bg-rose-950/30 border-2 border-rose-300 dark:border-rose-800 rounded-lg text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{approvalError}</span>
+          </div>
+        )}
+
         <div className="pt-2 flex items-center justify-between gap-4">
           <p className="text-[11px] text-neutral-500 dark:text-[#8E8DAF] italic">
             Note: Any edits to reviewer notes or executive summaries will invalidate approval and require re-verification.
           </p>
           <button
             onClick={handleApproveHandover}
-            disabled={!allChecklistItemsChecked || isApproved}
+            disabled={!allChecklistItemsChecked || approverName.trim().length === 0 || isApproved}
             className={`px-4 py-2 text-xs font-bold rounded-lg border-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
               isApproved
                 ? 'bg-emerald-600 text-white border-emerald-600 opacity-90 cursor-default'
-                : allChecklistItemsChecked
+                : allChecklistItemsChecked && approverName.trim().length > 0
                 ? 'bg-[#F36B3F] hover:bg-[#E0572C] text-white border-[#F36B3F] shadow-[2px_2px_0px_#25245F]'
                 : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-400 border-neutral-300 dark:border-neutral-700 cursor-not-allowed'
             }`}

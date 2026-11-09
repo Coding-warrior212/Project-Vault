@@ -45,6 +45,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
 }) => {
   const [showWorkspaceMenu, setShowWorkspaceMenu] = React.useState(false);
+  const [isChainActive, setIsChainActive] = React.useState(false);
+
+  const handleLogoClick = () => {
+    if (isChainActive) return;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) {
+      setIsChainActive(true);
+      setTimeout(() => setIsChainActive(false), 300);
+      return;
+    }
+    setIsChainActive(true);
+    setTimeout(() => {
+      setIsChainActive(false);
+    }, 1100);
+  };
 
   const navItems = [
     {
@@ -99,21 +114,75 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Main Sidebar */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-40 w-64 bg-[#25245F] dark:bg-[#15143C] text-white flex flex-col border-r-2 border-[#1B1A48] dark:border-[#232258] shadow-[4px_0px_0px_rgba(0,0,0,0.08)] transition-transform duration-200 ease-in-out lg:translate-x-0 ${
+        className={`fixed top-0 bottom-0 left-0 z-40 w-64 bg-[#25245F] dark:bg-[#15143C] text-white flex flex-col border-r-3 border-[#1B1A48] dark:border-[#2D2C68] shadow-[4px_0px_0px_rgba(0,0,0,0.25)] transition-transform duration-200 ease-in-out lg:translate-x-0 ${
           isOpenMobile ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Brand & Logo Area */}
-        <div className="p-5 border-b border-white/10">
+        <div className="p-5 border-b-2 border-white/15 bg-[#1B1A48]/40 relative overflow-hidden">
+          <style>{`
+            @keyframes letterSeparate {
+              0% { transform: translateX(0); }
+              35% { transform: translateX(var(--sep-x)); }
+              65% { transform: translateX(var(--sep-x)); }
+              100% { transform: translateX(0); }
+            }
+            @keyframes chainFade {
+              0% { opacity: 0; transform: scaleX(0.4); }
+              30% { opacity: 1; transform: scaleX(1); }
+              70% { opacity: 1; transform: scaleX(1); }
+              100% { opacity: 0; transform: scaleX(0.8); }
+            }
+            .chain-link-pulse {
+              animation: chainFade 1.1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            }
+          `}</style>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div
+              className="flex items-center gap-3 cursor-pointer group select-none relative"
+              onClick={handleLogoClick}
+              title="Click to trigger ProjectVault Connected Knowledge Chain effect"
+            >
               {/* Soft 3D Dimensional Vault Insignia */}
-              <Vault3DLogo size="md" />
+              <div className="transition-transform group-hover:scale-105">
+                <Vault3DLogo size="md" />
+              </div>
 
               <div>
-                <span className="text-base font-bold tracking-tight text-white flex items-center gap-1.5 font-sans">
-                  ProjectVault
-                </span>
+                <div className="text-base font-bold tracking-tight text-white flex items-center font-sans relative">
+                  {Array.from("ProjectVault").map((char, idx) => {
+                    const offset = (idx - 5.5) * 3;
+                    return (
+                      <span
+                        key={idx}
+                        style={{
+                          ['--sep-x' as any]: `${offset}px`,
+                          animation: isChainActive ? `letterSeparate 1.1s cubic-bezier(0.16, 1, 0.3, 1) forwards` : 'none',
+                          animationDelay: `${idx * 30}ms`,
+                        }}
+                        className="inline-block transition-transform will-change-transform text-white"
+                      >
+                        {char}
+                      </span>
+                    );
+                  })}
+
+                  {/* Connected Knowledge Chain SVG Overlay */}
+                  {isChainActive && (
+                    <svg className="absolute inset-x-0 -top-1 w-full h-8 overflow-visible pointer-events-none chain-link-pulse" viewBox="0 0 110 24" style={{ zIndex: 15 }}>
+                      <path
+                        d="M 2 12 Q 28 0 55 12 T 108 12"
+                        fill="none"
+                        stroke="#55C7C2"
+                        strokeWidth="1.5"
+                        strokeDasharray="4 2"
+                      />
+                      <circle cx="20" cy="6" r="2" fill="#F36B3F" />
+                      <circle cx="50" cy="14" r="2" fill="#FFF4E3" />
+                      <circle cx="80" cy="6" r="2" fill="#55C7C2" />
+                    </svg>
+                  )}
+                </div>
                 <p className="text-[11px] text-white/70 leading-tight">
                   Knowledge that stays.
                 </p>
@@ -131,10 +200,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Workspace Selector with Tactile 3D Inset */}
-        <div className="p-3 border-b border-white/10 relative">
+        <div className="p-3 border-b-2 border-white/15 relative bg-white/5">
           <button
             onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-            className="w-full flex items-center justify-between p-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-left transition-all text-xs border border-white/10 hover:border-white/20 active:translate-y-[1px]"
+            className="w-full flex items-center justify-between p-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-left transition-all text-xs border-2 border-white/20 hover:border-white/35 shadow-[2px_2px_0px_rgba(0,0,0,0.25)] active:translate-y-[1px]"
           >
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-6 h-6 rounded-md bg-[#FFF4E3] text-[#25245F] font-mono text-[10px] font-bold flex items-center justify-center shrink-0 shadow-xs border border-[#E5B25D]/50">
@@ -194,10 +263,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onNavigate(item.id);
                   onCloseMobile();
                 }}
-                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium rounded-lg transition-colors group ${
+                className={`w-full flex items-center justify-between px-3.5 py-2 text-xs font-medium transition-all group rounded-lg ${
                   isActive
-                    ? 'bg-[#F36B3F] text-white font-semibold shadow-xs'
-                    : 'text-white/75 hover:bg-white/10 hover:text-white'
+                    ? 'bg-[#F36B3F] text-white font-bold border-2 border-[#FFF4E3] dark:border-[#25245F] shadow-[3px_3px_0px_#14133B] dark:shadow-[3px_3px_0px_#0A0924]'
+                    : 'text-white/80 hover:bg-white/10 hover:text-white border-2 border-transparent hover:border-white/20'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
@@ -243,7 +312,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             const currentStage = getStage(currentPage);
 
             return (
-              <div className="pt-4 mt-4 border-t border-white/10 px-3">
+              <div className="pt-4 mt-4 border-t-2 border-white/15 px-3 bg-white/5 rounded-lg p-3 border-2 border-white/10 shadow-[2px_2px_0px_rgba(0,0,0,0.15)] mx-1">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] uppercase tracking-wider font-bold text-white/40">
                     Workflow Pipeline
@@ -301,10 +370,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
 
         {/* User Profile / Status Footer */}
-        <div className="p-3 border-t border-white/10 bg-[#1B1A48]/60">
-          <div className="flex items-center justify-between p-2 rounded-lg bg-white/5">
+        <div className="p-3 border-t-2 border-white/15 bg-[#1B1A48]/80">
+          <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 border-2 border-white/15 shadow-[2px_2px_0px_rgba(0,0,0,0.2)]">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#55C7C2] to-[#FFF4E3] text-[#25245F] font-bold text-xs flex items-center justify-center shrink-0">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#55C7C2] to-[#FFF4E3] text-[#25245F] font-bold text-xs flex items-center justify-center shrink-0 border border-[#25245F]">
                 ER
               </div>
               <div className="min-w-0">
@@ -316,7 +385,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               </div>
             </div>
-            <div className="w-2 h-2 rounded-full bg-[#55C7C2]" title="Session Active" />
+            <div className="w-2.5 h-2.5 rounded-full bg-[#55C7C2] border border-[#25245F]" title="Session Active" />
           </div>
         </div>
       </aside>
