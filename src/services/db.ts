@@ -75,6 +75,24 @@ const memorySources = new Map<string, Source>();
 const memoryFiles = new Map<string, { blob: Blob; filename: string; mimeType: string }>();
 const memoryClaims = new Map<string, KnowledgeClaim>();
 
+/**
+ * Keep the localStorage claims backup in sync with deletions. Reads are merged
+ * back into IndexedDB on the next load, so leaving deleted rows here resurrects them.
+ * A malformed backup is not silently overwritten: surface the failure to the caller.
+ */
+function removeClaimsFromLocalBackup(shouldRemove: (claim: KnowledgeClaim) => boolean): void {
+  const raw = localStorage.getItem('projectvault_claims');
+  if (!raw) return;
+
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed)) {
+    throw new Error('Invalid projectvault_claims backup: expected an array.');
+  }
+
+  const remaining = (parsed as KnowledgeClaim[]).filter((claim) => !shouldRemove(claim));
+  localStorage.setItem('projectvault_claims', JSON.stringify(remaining));
+}
+
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 function isIndexedDBAvailable(): boolean {
@@ -305,10 +323,14 @@ export async function deleteStoredSource(id: string): Promise<void> {
 
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error || new Error('Source deletion transaction aborted'));
     });
   } catch (error) {
-    console.warn('IndexedDB deleteStoredSource deleted from memory only:', error);
+    console.warn('IndexedDB deleteStoredSource fell back to memory:', error);
   }
+
+  // Also remove the backup entry; otherwise getAllStoredClaims can resurrect it.
+  removeClaimsFromLocalBackup((claim) => claim.sourceId === id);
 }
 
 /**
@@ -523,10 +545,13 @@ export async function deleteStoredClaimsBySourceId(sourceId: string): Promise<vo
 
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error || new Error('Claim deletion transaction aborted'));
     });
   } catch (error) {
-    console.warn('IndexedDB deleteStoredClaimsBySourceId deleted from memory only:', error);
+    console.warn('IndexedDB deleteStoredClaimsBySourceId fell back to memory:', error);
   }
+
+  removeClaimsFromLocalBackup((claim) => claim.sourceId === sourceId);
 }
 
 /**
@@ -542,12 +567,15 @@ export async function deleteStoredClaim(claimId: string): Promise<void> {
       const store = transaction.objectStore(STORE_CLAIMS);
       const request = store.delete(claimId);
 
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error || new Error('Claim deletion transaction aborted'));
     });
   } catch (error) {
-    console.warn('IndexedDB deleteStoredClaim deleted from memory only:', error);
+    console.warn('IndexedDB deleteStoredClaim fell back to memory:', error);
   }
+
+  removeClaimsFromLocalBackup((claim) => claim.id === claimId);
 }
 
 /**
@@ -575,8 +603,12 @@ export async function clearAllStoredSources(): Promise<void> {
 
       transaction.oncomplete = () => resolve();
       transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error || new Error('Clear transaction aborted'));
     });
   } catch (error) {
     console.warn('IndexedDB clearAllStoredSources cleared memory only:', error);
   }
+
+  // Clear only the claims backup; source/file binary data is stored separately.
+  localStorage.removeItem('projectvault_claims');
 }
