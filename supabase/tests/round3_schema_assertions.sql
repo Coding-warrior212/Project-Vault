@@ -61,9 +61,9 @@ BEGIN
   SELECT p.proname INTO v_bad
   FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
   WHERE n.nspname='public' AND p.prokind IN ('f','p')
-    AND pg_get_functiondef(p.oid) ILIKE '%projectvault.seed_mode%'
+    AND pg_get_functiondef(p.oid) ILIKE '%projectvault.%'
   LIMIT 1;
-  IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'Legacy forgeable seed GUC remains in function %',v_bad; END IF;
+  IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'Legacy forgeable projectvault custom setting remains in function %',v_bad; END IF;
 
   SELECT p.proname INTO v_bad
   FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
