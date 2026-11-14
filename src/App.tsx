@@ -55,6 +55,7 @@ import { appendWorkspaceActivity, deleteWorkspaceSource, loadWorkspaceData, save
 export default function App() {
   const cloud = useWorkspaceSession();
   const activeWorkspaceId = cloud?.workspace.id;
+  const activeActor = cloud ? (cloud.session.user.user_metadata?.full_name || cloud.session.user.email || 'Workspace member') : 'Elena Rostova';
   const [currentPage, setCurrentPage] = React.useState<AppPage>('overview');
   const [currentWorkspace, setCurrentWorkspace] = React.useState<Workspace>(() => cloud ? ({
     id: cloud.workspace.id, name: cloud.workspace.name, code: cloud.workspace.code,
@@ -268,7 +269,7 @@ export default function App() {
           ...q,
           status,
           answer: answer !== undefined ? answer : q.answer,
-          answeredBy: answer ? 'Elena Rostova (Lead Architect)' : q.answeredBy,
+          answeredBy: answer ? activeActor : q.answeredBy,
           answeredAt: answer ? 'Just now' : q.answeredAt,
         };
       }
@@ -299,7 +300,7 @@ export default function App() {
       ...target,
       verificationStatus: newStatus,
       humanReviewNotes: note !== undefined ? note : target.humanReviewNotes,
-      lastReviewedBy: 'Elena Rostova (Lead Architect)',
+      lastReviewedBy: activeActor,
       lastReviewedAt: 'Just now',
     };
 
@@ -341,7 +342,7 @@ export default function App() {
       timestamp: 'Just now',
       title: `Claim #${claimId} ${newStatus === 'verified' ? 'Verified & Approved' : newStatus === 'rejected' ? 'Rejected' : 'Flagged Uncertain'}`,
       description: target.statement,
-      actor: 'Elena Rostova',
+      actor: activeActor,
       claimId,
     };
 
