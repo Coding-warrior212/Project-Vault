@@ -19,7 +19,7 @@ This verifies the migration and the checks included in the disposable PostgreSQL
 
 The branch now contains `server/supabaseInvite.ts`, mounted before the large-document JSON parser, plus focused tests in `server/supabaseInvite.test.ts`. The route:
 - accepts only a normalized `PV-XXXX-XXXX` code and a Bearer session token;
-- asks Supabase Auth's `/auth/v1/user` endpoint to validate the session and derives the UUID from that response (request-body user IDs are ignored);
+- asks Supabase Auth's `/auth/v1/user` endpoint to validate the session, requires `is_anonymous === false`, and derives the UUID from that response (request-body user IDs are ignored);
 - hashes the normalized code with SHA-256 server-side;
 - calls the service-role-only RPC using `SUPABASE_SECRET_KEY` on the `apikey` header only (never as a Bearer token);
 - applies a bounded in-memory per-IP attempt limit, a 2 KB route body limit, and 10-second upstream request timeouts;
@@ -92,3 +92,5 @@ A further code review found an idempotency edge case in the original SQL RPC: it
 The development migration now checks existing membership before enforcing the use limit (while still rejecting unknown, revoked, expired, and demo-workspace invites). The local adversarial smoke SQL now creates a one-use invite, redeems it once, retries as the same user, and asserts that the second call is idempotent and the counter remains exactly one.
 
 **Verification status:** code and regression test are committed; the updated local PostgreSQL script has **not yet been rerun** after this change. Do not treat this fix as runtime-verified until that rerun passes.
+
+The invite route also fails closed for anonymous Auth users: Supabase's verified user response must explicitly report `is_anonymous: false`. The test suite now includes an anonymous-user denial case. Reference: https://supabase.com/docs/guides/auth/users.
