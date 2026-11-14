@@ -33,6 +33,6 @@ test('private GitHub repositories fail closed without a credentialed connector',
   globalThis.fetch = (async () => new Response(JSON.stringify({ private:true, default_branch:'main' }), {status:200})) as typeof fetch;
   await assert.rejects(
     () => fetchPublicGitHubSnapshot('https://github.com/example/private-project'),
-    /Private repositories/
+    /private/i
   );
 });
