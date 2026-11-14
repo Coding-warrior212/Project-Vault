@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   ExternalLink,
+  Network,
 } from 'lucide-react';
 
 import { Vault3DLogo } from '../common/Soft3DVisuals';
@@ -78,6 +79,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'ledger' as AppPage,
       label: 'Knowledge Ledger',
       icon: FileSpreadsheet,
+      badge: null,
+    },
+    {
+      id: 'graph' as AppPage,
+      label: 'Knowledge Graph',
+      icon: Network,
       badge: null,
     },
     {
