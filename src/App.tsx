@@ -28,6 +28,7 @@ import { ReconstructModal } from './components/sources/ReconstructModal';
 import { KnowledgeLedgerPage } from './components/ledger/KnowledgeLedgerPage';
 import { ReviewPage } from './components/review/ReviewPage';
 import { KnowledgeGraphPage } from './components/graph/KnowledgeGraphPage';
+import { fetchPublicGitHubSnapshot } from './services/githubSnapshot';
 import { HandoverPage } from './components/handover/HandoverPage';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { ClaimModal } from './components/common/ClaimModal';
@@ -51,7 +52,7 @@ import {
 } from './data/sampleData';
 import { ProjectConflict, MissingInfoFinding, UnresolvedQuestion } from './types';
 import { useWorkspaceSession } from './components/auth/WorkspaceSessionContext';
-import { appendWorkspaceActivity, deleteWorkspaceSource, loadWorkspaceData, saveWorkspaceClaims, saveWorkspaceConflicts, saveWorkspaceMissingInfo, saveWorkspaceQuestions, saveWorkspaceSource, subscribeWorkspaceChanges, updateWorkspaceClaim } from './services/workspaceCloud';
+import { appendWorkspaceActivity, deleteWorkspaceSource, loadWorkspaceData, saveWorkspaceClaims, saveWorkspaceConflicts, saveWorkspaceMissingInfo, saveWorkspaceQuestions, saveWorkspaceSource, subscribeWorkspaceChanges, updateWorkspaceClaim, uploadWorkspaceSourceFile } from './services/workspaceCloud';
 
 export default function App() {
   const cloud = useWorkspaceSession();
@@ -459,6 +460,47 @@ export default function App() {
     }
   };
 
+  const handleSyncGitHubSource = async (source: Source) => {
+    if (source.type !== 'github' || !source.githubUrl) return;
+    try {
+      const snapshot = await fetchPublicGitHubSnapshot(source.githubUrl, source.repoBranch || '');
+      const file = new globalThis.File([snapshot.snapshot], `${snapshot.repo}-${snapshot.branch}-snapshot.md`, { type: 'text/markdown' });
+      const hash = await (await import('./services/extractor')).computeFileHash(file);
+      const updatedSource: Source = {
+        ...source, title: source.title || `${snapshot.owner}/${snapshot.repo}`,
+        filename: `${snapshot.owner}/${snapshot.repo}@${snapshot.branch}`,
+        repoBranch: snapshot.branch, githubOwner: snapshot.owner, githubRepo: snapshot.repo,
+        githubUrl: snapshot.url, commitSha: snapshot.commitSha, lastSyncedAt: new Date().toISOString(),
+        size: `${(file.size / 1024).toFixed(1)} KB`, sizeBytes: file.size,
+        ingestedAt: 'Just now', timestamp: Date.now(), extractedText: snapshot.snapshot,
+        rawExcerpt: snapshot.snapshot.slice(0, 300), charCount: snapshot.snapshot.length,
+        wordCount: snapshot.snapshot.trim().split(/\\s+/).length, contentHash: hash,
+        summary: `${snapshot.description} Synced ${snapshot.filesIncluded} documentation files at commit ${snapshot.commitSha.slice(0, 12)}.`,
+        tags: ['GitHub', 'Public Repository', 'Documentation Snapshot'],
+      };
+      if (activeWorkspaceId) {
+        await uploadWorkspaceSourceFile(activeWorkspaceId, updatedSource, file, false);
+        await saveWorkspaceSource(activeWorkspaceId, updatedSource);
+      } else {
+        const { saveStoredSource, saveStoredFile } = await import('./services/db');
+        await saveStoredSource(updatedSource);
+        await saveStoredFile(updatedSource.id, file);
+      }
+      setSources((previous) => previous.map((item) => item.id === source.id ? updatedSource : item));
+      const event: ActivityEvent = {
+        id: `act-${Date.now()}`, type: 'github_synced', timestamp: 'Just now',
+        title: `GitHub snapshot synced: ${snapshot.owner}/${snapshot.repo}`,
+        description: `Updated documentation snapshot to commit ${snapshot.commitSha.slice(0, 12)}.`,
+        actor: activeActor, sourceId: source.id,
+      };
+      setActivity((previous) => [event, ...previous]);
+      if (activeWorkspaceId) await appendWorkspaceActivity(activeWorkspaceId, event);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'GitHub synchronization failed.');
+      throw error;
+    }
+  };
+
   // Handle deleting a source (cascades deletion of claims)
   const handleDeleteSource = async (sourceId: string) => {
     const target = sources.find((s) => s.id === sourceId);
@@ -696,6 +738,7 @@ export default function App() {
         onNavigateToLedger={() => handleNavigateToLedgerFiltered(inspectingSource?.id)}
         onDeleteSource={handleDeleteSource}
         onReconstructSource={handleOpenReconstructModal}
+        onSyncGitHubSource={handleSyncGitHubSource}
       />
 
       {/* Reconstruct Knowledge Modal (Gemini 3.8 Flash) */}
