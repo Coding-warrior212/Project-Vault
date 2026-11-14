@@ -2,6 +2,7 @@ import React from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { ArrowRight, CheckCircle2, Chrome, KeyRound, LockKeyhole, LogOut, Mail, ShieldCheck, Users } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { WorkspaceSessionProvider } from './WorkspaceSessionContext';
 
 type WorkspaceAccess = {
   id: string;
@@ -29,6 +30,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [message, setMessage] = React.useState('');
   const [error, setError] = React.useState('');
   const [workspaces, setWorkspaces] = React.useState<WorkspaceAccess[]>([]);
+  const [activeWorkspace, setActiveWorkspace] = React.useState<WorkspaceAccess | null>(null);
   const [workspaceLoading, setWorkspaceLoading] = React.useState(false);
   const [inviteCode, setInviteCode] = React.useState('');
   const [inviteBusy, setInviteBusy] = React.useState(false);
@@ -230,6 +232,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
     setBusy(true);
     const { error: signOutError } = await supabase.auth.signOut();
     if (signOutError) setError(signOutError.message);
+    else setActiveWorkspace(null);
     setBusy(false);
   };
 
@@ -305,6 +308,28 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
     );
   }
 
+  if (activeWorkspace && workspaces.some((workspace) => workspace.id === activeWorkspace.id)) {
+    return (
+      <WorkspaceSessionProvider value={{
+        session,
+        workspace: activeWorkspace,
+        selectWorkspace: setActiveWorkspace,
+        switchWorkspace: () => setActiveWorkspace(null),
+      }}>
+        <div className="min-h-screen bg-slate-100">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-8">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-slate-900">{activeWorkspace.name}</p>
+              <p className="text-[11px] text-slate-500">{activeWorkspace.role} · {session.user.email}</p>
+            </div>
+            <button type="button" onClick={() => setActiveWorkspace(null)} className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Switch workspace</button>
+          </div>
+          {children}
+        </div>
+      </WorkspaceSessionProvider>
+    );
+  }
+
   return (
     <AuthShell wide>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -330,7 +355,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
         </div>
         {workspaceLoading ? <p className="rounded-xl border border-slate-200 p-5 text-sm text-slate-500">Checking workspace memberships…</p> :
           workspaces.length === 0 ? <p className="rounded-xl border border-dashed border-slate-300 p-5 text-sm text-slate-600">No team workspace memberships were found for this account yet. Redeem an invitation below to join a workspace.</p> :
-          <div className="grid gap-3 sm:grid-cols-2">{workspaces.map((workspace) => <div key={workspace.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900">{workspace.name}</p><p className="mt-1 font-mono text-[11px] text-slate-500">{workspace.code}</p></div><span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase text-indigo-800">{workspace.role}</span></div><p className="mt-3 text-xs leading-5 text-slate-600">{workspace.description || workspace.projectType}</p><p className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-teal-700"><CheckCircle2 className="h-3.5 w-3.5" /> Membership verified</p></div>)}</div>
+          <div className="grid gap-3 sm:grid-cols-2">{workspaces.map((workspace) => <button type="button" key={workspace.id} onClick={() => setActiveWorkspace(workspace)} className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-indigo-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-300"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900">{workspace.name}</p><p className="mt-1 font-mono text-[11px] text-slate-500">{workspace.code}</p></div><span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase text-indigo-800">{workspace.role}</span></div><p className="mt-3 text-xs leading-5 text-slate-600">{workspace.description || workspace.projectType}</p><p className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-teal-700"><CheckCircle2 className="h-3.5 w-3.5" /> Membership verified · Open workspace <ArrowRight className="ml-auto h-4 w-4" /></p></button>)}</div>
         }
       </div>
 
@@ -340,8 +365,8 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
         <p className="mt-2 text-[11px] text-slate-500">The server validates your Supabase session and redeems the invite atomically. User IDs are never accepted from the browser.</p>
       </form>
 
-      <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-950">
-        <strong>Workspace data connection is the next milestone.</strong> Your membership and role are verified, but the existing project screens still use local demo data. Private workspace records are intentionally not displayed until the cloud persistence adapter is connected and tested.
+      <div className="mt-6 rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-xs leading-5 text-indigo-950">
+        <strong>Select a workspace to continue.</strong> Project records are loaded only after you open an authorized workspace. Local demo records are never copied into team workspaces automatically.
       </div>
       <AuthFeedback error={error} message={message} />
     </AuthShell>
