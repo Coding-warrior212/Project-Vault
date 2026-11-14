@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { ArrowRight, CheckCircle2, Github, KeyRound, LockKeyhole, LogOut, Mail, ShieldCheck, Users } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Chrome, KeyRound, LockKeyhole, LogOut, Mail, ShieldCheck, Users } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 
 type WorkspaceAccess = {
@@ -264,7 +264,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
 
         {mode === 'sign_in' && <button type="button" disabled={busy} onClick={handlePasswordReset} className="mt-3 w-full text-center text-xs font-semibold text-indigo-700 hover:text-indigo-950">Forgot password?</button>}
         <div className="my-5 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />or continue with<span className="h-px flex-1 bg-slate-200" /></div>
-        <button type="button" onClick={handleGoogleSignIn} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"><Github className="h-4 w-4" /> Continue with Google</button>
+        <button type="button" onClick={handleGoogleSignIn} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"><Chrome className="h-4 w-4" /> Continue with Google</button>
         <p className="mt-4 text-center text-[11px] text-slate-500">Your workspace access is enforced by Supabase Row Level Security, not by client-side filtering alone.</p>
         <AuthFeedback error={error} message={message} />
       </AuthShell>
