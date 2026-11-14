@@ -67,13 +67,13 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
       setSelectedPageNum(1);
       setIsDeleting(false);
       setSearchInDoc('');
+      setDownloadError(null);
     }
   }, [source?.id]);
 
   if (!source) return null;
 
   const sourceClaims = claims.filter((c) => c.sourceId === source.id);
-  React.useEffect(() => { setDownloadError(null); }, [source.id]);
   const isPdfWithPages = source.type === 'pdf' && source.pages && source.pages.length > 0;
   const isUserUploaded = Boolean(source.isUserUploaded);
   const displayText = source.extractedText || source.rawExcerpt || '';
@@ -163,7 +163,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
                 {isUserUploaded ? (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    USER UPLOADED · INDEXEDDB
+                    {cloud ? 'USER UPLOADED · PRIVATE CLOUD' : 'USER UPLOADED · INDEXEDDB'}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-white/10 text-white/90 border border-white/20">
