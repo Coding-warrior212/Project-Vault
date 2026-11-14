@@ -118,7 +118,7 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
     void refresh().then(() => {
       if (active) unsubscribe = subscribeWorkspaceChanges(cloud.workspace.id, () => {
         void refresh().catch((error) => console.error('Realtime handover refresh failed:', error));
-      });
+      }, 'handover');
     }).catch((error) => {
       console.error('Handover load failed:', error);
       if (active) setApprovalError('Shared handover state could not be loaded. Please retry before approving.');
