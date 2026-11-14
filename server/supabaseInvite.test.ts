@@ -36,7 +36,7 @@ test('redemption derives the user ID from Supabase Auth and sends the secret onl
     const url = String(input);
     calls.push({ url, init });
     if (url.endsWith('/auth/v1/user')) {
-      return new Response(JSON.stringify({ id: USER_ID }), { status: 200 });
+      return new Response(JSON.stringify({ id: USER_ID, is_anonymous: false }), { status: 200 });
     }
     return new Response(JSON.stringify([{
       workspace_id: 'ws-real',
@@ -77,6 +77,35 @@ test('redemption derives the user ID from Supabase Auth and sends the secret onl
   assert.equal(rpcBody.p_user_id, USER_ID);
   assert.equal(rpcBody.p_code_hash, hashInviteCode('PV-AB12-CD34'));
   assert.notEqual(rpcBody.p_user_id, 'attacker-controlled-id');
+});
+
+
+test('redemption rejects anonymous Supabase users', async () => {
+  let rpcCalls = 0;
+  const app = express();
+  app.use(express.json());
+  app.use(createInviteRouter({
+    supabaseUrl: 'https://example.supabase.co',
+    publishableKey: 'sb_publishable_test',
+    secretKey: 'sb_secret_test',
+    fetchImpl: async (input) => {
+      if (String(input).endsWith('/auth/v1/user')) {
+        return new Response(JSON.stringify({ id: USER_ID, is_anonymous: true }), { status: 200 });
+      }
+      rpcCalls += 1;
+      return new Response('[]', { status: 200 });
+    },
+  }));
+
+  await withServer(app, async (url) => {
+    const response = await fetch(`${url}/api/workspaces/redeem-invite`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer anonymous-session-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: 'PV-AB12-CD34' }),
+    });
+    assert.equal(response.status, 403);
+  });
+  assert.equal(rpcCalls, 0);
 });
 
 test('redemption rejects requests without a bearer session before calling Supabase', async () => {
