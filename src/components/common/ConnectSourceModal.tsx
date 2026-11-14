@@ -413,6 +413,7 @@ export const ConnectSourceModal: React.FC<ConnectSourceModalProps> = ({
                 <input
                   type="text"
                   value={repoUrl}
+                  placeholder="https://github.com/owner/repository"
                   onChange={(e) => setRepoUrl(e.target.value)}
                   className="w-full p-2.5 bg-neutral-50 dark:bg-[#14133B] border-2 border-neutral-300 dark:border-[#35337C] rounded-lg font-mono text-neutral-900 dark:text-[#FFF4E3] focus:outline-none focus:border-[#25245F] dark:focus:border-[#55C7C2]"
                 />
@@ -425,6 +426,7 @@ export const ConnectSourceModal: React.FC<ConnectSourceModalProps> = ({
                 <input
                   type="text"
                   value={branch}
+                  placeholder="Leave blank to use the default branch"
                   onChange={(e) => setBranch(e.target.value)}
                   className="w-full p-2.5 bg-neutral-50 dark:bg-[#14133B] border-2 border-neutral-300 dark:border-[#35337C] rounded-lg font-mono text-neutral-900 dark:text-[#FFF4E3] focus:outline-none focus:border-[#25245F] dark:focus:border-[#55C7C2]"
                 />
