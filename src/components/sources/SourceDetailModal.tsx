@@ -374,7 +374,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
                   )}
                 </button>
 
-                {source.type === 'github' && onSyncGitHubSource && <button
+                {source.type === 'github' && source.isUserUploaded && source.githubUrl && onSyncGitHubSource && <button
                   type="button" onClick={handleSyncGitHub} disabled={isSyncingGitHub}
                   className="px-2.5 py-1 text-xs font-bold text-white bg-[#25245F] hover:bg-[#1B1A48] rounded-md border border-[#25245F] disabled:opacity-50"
                   title="Fetch the latest commit and refresh the documentation snapshot"
