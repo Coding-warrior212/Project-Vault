@@ -57,7 +57,7 @@ BEGIN
  IF NOT EXISTS(SELECT 1 FROM private.operation_capabilities c WHERE c.transaction_id=pg_catalog.pg_current_xact_id() AND c.operation=p_operation AND c.actor_id IS NOT DISTINCT FROM p_actor_id) THEN
   RAISE EXCEPTION 'Conflicting internal capability actor' USING ERRCODE='42501';
  END IF;
-END; $;
+END; $$;
 REVOKE ALL ON FUNCTION private.has_operation_capability(text) FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON FUNCTION private.operation_actor(text) FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON FUNCTION private.grant_operation_capability(text,uuid) FROM PUBLIC,anon,authenticated,service_role;
@@ -1345,7 +1345,7 @@ BEGIN
   END IF; RETURN NEW;
  END IF;
  RAISE EXCEPTION 'INVITE_DELETE_DISABLED' USING ERRCODE='42501';
-END; $;
+END; $$;
 
 -- 4.12 Attach All Triggers cleanly (idempotent DROP + CREATE)
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
