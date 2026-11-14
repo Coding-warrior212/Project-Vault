@@ -2148,14 +2148,12 @@ BEGIN
     RAISE EXCEPTION 'INVITE_EXPIRED: This invite code has expired' USING ERRCODE = '42501';
   END IF;
 
-  IF v_invite.uses_count >= v_invite.max_uses THEN
-    RAISE EXCEPTION 'INVITE_EXHAUSTED: This invite code has reached its maximum uses' USING ERRCODE = '42501';
-  END IF;
-
   IF v_invite.granted_role = 'owner' THEN
     RAISE EXCEPTION 'OWNER_PROTECTION: Invite codes can never grant owner role' USING ERRCODE = '42501';
   END IF;
 
+  -- Check membership before the use limit: a retry after a committed redemption
+  -- must return the existing membership instead of failing as "exhausted".
   SELECT wm.role INTO v_existing_role
     FROM public.workspace_members wm
    WHERE wm.workspace_id = v_invite.workspace_id AND wm.user_id = p_user_id;
@@ -2163,6 +2161,10 @@ BEGIN
   IF v_existing_role IS NOT NULL THEN
     RETURN QUERY SELECT v_invite.workspace_id, v_existing_role, true;
     RETURN;
+  END IF;
+
+  IF v_invite.uses_count >= v_invite.max_uses THEN
+    RAISE EXCEPTION 'INVITE_EXHAUSTED: This invite code has reached its maximum uses' USING ERRCODE = '42501';
   END IF;
 
   SELECT COALESCE(NULLIF(btrim(p.full_name), ''), p.email)
