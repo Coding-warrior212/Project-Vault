@@ -121,3 +121,26 @@ Static inspection of the committed migration confirms:
 5. Only then review and authorize applying the migration to the hosted project.
 
 The temporary Supabase validation branch was quoted at **$0.01344/hour**. Creation is waiting for explicit cost approval.
+
+
+## Local validation preparation update — 2026-11-14
+
+- Corrected six malformed single-dollar PL/pgSQL function delimiters found during static review; all function bodies now use paired `$$` delimiters.
+- Added a local PostgreSQL 17 bootstrap with minimal Auth/Storage stubs:
+  `supabase/tests/local-bootstrap.sql`.
+- Added local smoke checks for seeded demo data, capability cleanup and forged `projectvault.seed_mode` GUC attempts:
+  `supabase/tests/local-adversarial-smoke.sql`.
+- Added a no-cloud local runner:
+  `scripts/validate-db-local.sh`.
+- Added instructions and explicit scope limitations in `supabase/tests/README.md`.
+
+Latest static scan of the committed migration:
+- 2,650 lines / 124,286 bytes.
+- 14 application tables, all 14 with RLS enabled.
+- 60 policies, 41 triggers, 27 functions.
+- 25 SECURITY DEFINER functions; all have a fixed search_path.
+- Balanced parentheses and dollar-quoted blocks; no unterminated SQL lexical states.
+- No remaining caller-settable `projectvault.*` privilege GUC checks.
+- One top-level BEGIN/COMMIT pair.
+
+**Execution status:** the local runner has been committed but has not been executed in this environment: Docker, PostgreSQL client/server binaries and outbound package/image network access are unavailable here. Therefore the migration is still unexecuted, and Milestone 2 remains open. The user can run the free local script from the repository root when Docker Desktop is available. A passing local run must not be represented as proof of Supabase-hosted behavior.
