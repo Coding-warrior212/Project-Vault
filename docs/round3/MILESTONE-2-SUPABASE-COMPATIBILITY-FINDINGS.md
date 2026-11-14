@@ -15,17 +15,21 @@ NOTE: this does not replace testing on a real Supabase project.
 
 This verifies the migration and the checks included in the disposable PostgreSQL 17 harness. The harness explicitly uses Auth/Storage stubs and does not verify managed Supabase, PostgREST, Auth, Realtime or Storage service behavior.
 
-## Confirmed integration blocker: trusted invite redemption has no backend route yet
+## Server-side invite redemption boundary added; integration remains pending
 
-Inspection of the current `server.ts` on this branch found:
-- no Supabase client initialization or Supabase SDK usage;
-- no JWT/Bearer-token verification middleware;
-- no invite redemption route;
-- the only declared API routes are Gemini status, knowledge extraction, conflict analysis, and the static fallback route.
+The branch now contains `server/supabaseInvite.ts`, mounted before the large-document JSON parser, plus focused tests in `server/supabaseInvite.test.ts`. The route:
+- accepts only a normalized `PV-XXXX-XXXX` code and a Bearer session token;
+- asks Supabase Auth's `/auth/v1/user` endpoint to validate the session and derives the UUID from that response (request-body user IDs are ignored);
+- hashes the normalized code with SHA-256 server-side;
+- calls the service-role-only RPC using `SUPABASE_SECRET_KEY` on the `apikey` header only (never as a Bearer token);
+- applies a bounded in-memory per-IP attempt limit, a 2 KB route body limit, and 10-second upstream request timeouts;
+- returns sanitized error messages and does not expose raw Postgres/Auth response bodies.
 
-The migration defines `public.redeem_workspace_invite_by_hash_atomic(uuid, text)` and grants its execution only to `service_role`. It accepts a `p_user_id` parameter. This is an appropriate restricted database entry point only if the server verifies the caller's Supabase access token, derives the user ID from the verified JWT (never from request JSON), rate-limits attempts, hashes the submitted invite code server-side, and invokes the RPC using the server-only `SUPABASE_SECRET_KEY`.
+The test command is `npm run test:server`. **It has been committed but has not yet been executed in this environment**, so behavior is not marked tested. The endpoint is not yet connected to a sign-in UI, and it cannot work until the server environment contains `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY`. The secret must remain server-only.
 
-**Required before enabling invite redemption:** implement and test that server boundary. Do not expose the service-role key to the browser or accept a user ID supplied by the client.
+Supabase's current JWT documentation recommends validating HS256 user sessions through the Auth `/auth/v1/user` endpoint when the server does not use a JWT verification SDK; the new publishable/secret key guidance says secret keys belong in backend code and should be sent on the `apikey` header, not as a Bearer token. See https://supabase.com/docs/guides/auth/jwts and https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys.
+
+**Remaining integration work:** run the automated tests and TypeScript/build checks, wire a real browser Auth flow, and verify the route against a disposable Supabase environment after explicit approval. Do not expose the service key to the browser or accept a user ID supplied by the client.
 
 ## Storage update semantics require a product decision and matching test
 
@@ -65,7 +69,7 @@ The current Storage policy set has a SELECT policy for workspace members, an INS
 
 ### API and client integration state
 
-The checked `package.json` contains no `@supabase/supabase-js` dependency. The checked `server.ts` has no Supabase client, JWT verification middleware, authenticated invite endpoint, or Supabase-backed persistence route. The checked app's existing persistence remains browser-side IndexedDB/localStorage. Consequently, the SQL migration is not yet connected to the running application.
+The checked `package.json` still contains no `@supabase/supabase-js` dependency; the new invite endpoint uses Supabase Auth and PostgREST HTTP endpoints directly with Node's built-in `fetch`. `server.ts` now mounts the verified invite route. The app itself still has no Supabase sign-in UI or Supabase-backed persistence route; its existing persistence remains browser-side IndexedDB/localStorage. Consequently, the SQL migration is only partially connected to the running application.
 
 ### Validation scope clarification
 
@@ -73,10 +77,10 @@ The user's successful local run proves that the migration executes in the local 
 
 ### Safe next implementation sequence
 
-1. Specify the browser/server trust boundary and choose a pinned Supabase JS dependency version only after checking current Supabase docs and project runtime compatibility.
-2. Add server-side bearer-token verification that derives actor identity from a verified Supabase JWT; never accept actor IDs from request JSON.
-3. Add rate-limited invite redemption that hashes invite codes server-side and calls the service-role-only RPC with the server-only secret.
-4. Define immutable-source-file versus same-key replacement behavior, then align Storage policy and upload code.
-5. Add tests for the implemented route and storage lifecycle; run build/type checks and local tests.
-6. Keep Milestone 2 open until actual Supabase-specific gates are verified. No hosted migration, deployment, merge, or secret change is authorized by this review.
+1. Run `npm run test:server`, `npm run lint`, and `npm run build`; fix any failures.
+2. Wire browser Supabase Auth (Google and email/password) to the new invite endpoint without ever exposing the secret key.
+3. Define immutable-source-file versus same-key replacement behavior, then align Storage policy and upload code.
+4. Add tests for the storage lifecycle and actual role/tenant isolation.
+5. Verify the invite route, RLS, RPC grants, and Storage against a disposable Supabase environment only after explicit execution/cost approval.
+6. Keep Milestone 2 open until all required Supabase-specific gates are verified. No hosted migration, deployment, merge, or secret change is authorized by this review.
 
