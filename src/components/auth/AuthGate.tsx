@@ -34,6 +34,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [workspaceLoading, setWorkspaceLoading] = React.useState(false);
   const [inviteCode, setInviteCode] = React.useState('');
   const [inviteBusy, setInviteBusy] = React.useState(false);
+  const [demoMode, setDemoMode] = React.useState(false);
 
   React.useEffect(() => {
     if (!supabase) {
@@ -250,6 +251,18 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
     );
   }
 
+  if (demoMode) {
+    return (
+      <div className="min-h-screen bg-slate-100">
+        <div role="status" className="sticky top-0 z-50 flex flex-col gap-2 border-b border-amber-300 bg-amber-50 px-4 py-3 text-center sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="text-xs font-semibold text-amber-950"><span className="font-black tracking-wider">INTERACTIVE JUDGE DEMO</span><span className="mx-2 hidden sm:inline">·</span><span className="block font-normal sm:inline">Sample data only. Changes stay in this browser and never enter team workspaces.</span></div>
+          <button type="button" onClick={() => setDemoMode(false)} className="mx-auto rounded-lg border border-amber-400 bg-white px-3 py-2 text-xs font-bold text-amber-950 hover:bg-amber-100 sm:mx-0">Exit demo</button>
+        </div>
+        {children}
+      </div>
+    );
+  }
+
   if (authLoading) {
     return <AuthShell><div className="py-12 text-center text-sm text-slate-600">Restoring your secure session…</div></AuthShell>;
   }
@@ -287,6 +300,8 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
         {mode === 'sign_in' && <button type="button" disabled={busy} onClick={handlePasswordReset} className="mt-3 w-full text-center text-xs font-semibold text-indigo-700 hover:text-indigo-950">Forgot password?</button>}
         <div className="my-5 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />or continue with<span className="h-px flex-1 bg-slate-200" /></div>
         <button type="button" onClick={handleGoogleSignIn} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"><Chrome className="h-4 w-4" /> Continue with Google</button>
+        <div className="my-5 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />or explore first<span className="h-px flex-1 bg-slate-200" /></div>
+        <button type="button" onClick={() => setDemoMode(true)} className="flex w-full items-center justify-center gap-2 rounded-xl border border-teal-300 bg-teal-50 px-4 py-3 text-sm font-bold text-teal-950 transition hover:bg-teal-100">Explore interactive demo <ArrowRight className="h-4 w-4" /></button>
         <p className="mt-4 text-center text-[11px] text-slate-500">Your workspace access is enforced by Supabase Row Level Security, not by client-side filtering alone.</p>
         <AuthFeedback error={error} message={message} />
       </AuthShell>
@@ -367,6 +382,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
         <p className="mt-2 text-[11px] text-slate-500">The server validates your Supabase session and redeems the invite atomically. User IDs are never accepted from the browser.</p>
       </form>
 
+      <button type="button" onClick={() => setDemoMode(true)} className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-teal-300 bg-teal-50 px-4 py-3 text-sm font-bold text-teal-950 transition hover:bg-teal-100">Explore interactive demo <ArrowRight className="h-4 w-4" /></button>
       <div className="mt-6 rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-xs leading-5 text-indigo-950">
         <strong>Select a workspace to continue.</strong> Project records are loaded only after you open an authorized workspace. Local demo records are never copied into team workspaces automatically.
       </div>
