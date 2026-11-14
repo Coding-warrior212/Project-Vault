@@ -12,7 +12,7 @@ import { Source, KnowledgeClaim, ProjectConflict, MissingInfoFinding, Unresolved
  */
 export async function getAllStoredConflicts(): Promise<ProjectConflict[]> {
   try {
-    const data = localStorage.getItem(getScopedLocalStorageKey('projectvault_review_conflicts');
+    const data = localStorage.getItem(getScopedLocalStorageKey('projectvault_review_conflicts'));
     if (data) return JSON.parse(data);
   } catch (e) {
     console.warn('localStorage conflicts load failed:', e);
@@ -22,7 +22,7 @@ export async function getAllStoredConflicts(): Promise<ProjectConflict[]> {
 
 export async function saveStoredConflicts(conflicts: ProjectConflict[]): Promise<void> {
   try {
-    localStorage.setItem('projectvault_review_conflicts', JSON.stringify(conflicts));
+    localStorage.setItem(getScopedLocalStorageKey('projectvault_review_conflicts'), JSON.stringify(conflicts));
   } catch (e) {
     console.warn('localStorage conflicts save failed:', e);
   }
@@ -30,7 +30,7 @@ export async function saveStoredConflicts(conflicts: ProjectConflict[]): Promise
 
 export async function getAllStoredMissingInfo(): Promise<MissingInfoFinding[]> {
   try {
-    const data = localStorage.getItem(getScopedLocalStorageKey('projectvault_review_missing');
+    const data = localStorage.getItem(getScopedLocalStorageKey('projectvault_review_missing'));
     if (data) return JSON.parse(data);
   } catch (e) {
     console.warn('localStorage missing info load failed:', e);
@@ -40,7 +40,7 @@ export async function getAllStoredMissingInfo(): Promise<MissingInfoFinding[]> {
 
 export async function saveStoredMissingInfo(items: MissingInfoFinding[]): Promise<void> {
   try {
-    localStorage.setItem('projectvault_review_missing', JSON.stringify(items));
+    localStorage.setItem(getScopedLocalStorageKey('projectvault_review_missing'), JSON.stringify(items));
   } catch (e) {
     console.warn('localStorage missing info save failed:', e);
   }
@@ -48,7 +48,7 @@ export async function saveStoredMissingInfo(items: MissingInfoFinding[]): Promis
 
 export async function getAllStoredQuestions(): Promise<UnresolvedQuestion[]> {
   try {
-    const data = localStorage.getItem(getScopedLocalStorageKey('projectvault_review_questions');
+    const data = localStorage.getItem(getScopedLocalStorageKey('projectvault_review_questions'));
     if (data) return JSON.parse(data);
   } catch (e) {
     console.warn('localStorage questions load failed:', e);
@@ -58,7 +58,7 @@ export async function getAllStoredQuestions(): Promise<UnresolvedQuestion[]> {
 
 export async function saveStoredQuestions(questions: UnresolvedQuestion[]): Promise<void> {
   try {
-    localStorage.setItem('projectvault_review_questions', JSON.stringify(questions));
+    localStorage.setItem(getScopedLocalStorageKey('projectvault_review_questions'), JSON.stringify(questions));
   } catch (e) {
     console.warn('localStorage questions save failed:', e);
   }
@@ -104,7 +104,7 @@ const memoryClaims = () => memoryStores[storageScope].claims;
  * A malformed backup is not silently overwritten: surface the failure to the caller.
  */
 function removeClaimsFromLocalBackup(shouldRemove: (claim: KnowledgeClaim) => boolean): void {
-  const raw = localStorage.getItem(getScopedLocalStorageKey('projectvault_claims');
+  const raw = localStorage.getItem(getScopedLocalStorageKey('projectvault_claims'));
   if (!raw) return;
 
   const parsed: unknown = JSON.parse(raw);
@@ -113,7 +113,7 @@ function removeClaimsFromLocalBackup(shouldRemove: (claim: KnowledgeClaim) => bo
   }
 
   const remaining = (parsed as KnowledgeClaim[]).filter((claim) => !shouldRemove(claim));
-  localStorage.setItem('projectvault_claims', JSON.stringify(remaining));
+  localStorage.setItem(getScopedLocalStorageKey('projectvault_claims'), JSON.stringify(remaining));
 }
 
 const dbPromises: Partial<Record<LocalStorageScope, Promise<IDBDatabase>>> = {};
@@ -403,13 +403,13 @@ export async function saveStoredClaims(claims: KnowledgeClaim[]): Promise<void> 
   let localStorageSuccess = false;
   try {
     const existingMap = new Map<string, KnowledgeClaim>();
-    const localData = localStorage.getItem(getScopedLocalStorageKey('projectvault_claims');
+    const localData = localStorage.getItem(getScopedLocalStorageKey('projectvault_claims'));
     if (localData) {
       const parsed: KnowledgeClaim[] = JSON.parse(localData);
       parsed.forEach((c) => existingMap.set(c.id, c));
     }
     claims.forEach((c) => existingMap.set(c.id, c));
-    localStorage.setItem('projectvault_claims', JSON.stringify(Array.from(existingMap.values())));
+    localStorage.setItem(getScopedLocalStorageKey('projectvault_claims'), JSON.stringify(Array.from(existingMap.values())));
     localStorageSuccess = true;
     console.log('[DIAGNOSTIC] localStorage write SUCCESS for claims:', claims.map(c => ({ id: c.id, status: c.verificationStatus, flag: c.isFlagged })));
   } catch (e) {
@@ -499,7 +499,7 @@ export async function getAllStoredClaims(): Promise<KnowledgeClaim[]> {
 
   let localClaims: KnowledgeClaim[] = [];
   try {
-    const localData = localStorage.getItem(getScopedLocalStorageKey('projectvault_claims');
+    const localData = localStorage.getItem(getScopedLocalStorageKey('projectvault_claims'));
     if (localData) {
       localClaims = JSON.parse(localData);
     }
@@ -635,7 +635,7 @@ export async function clearAllStoredSources(): Promise<void> {
   }
 
   // Clear only the claims backup; source/file binary data is stored separately.
-  localStorage.removeItem(getScopedLocalStorageKey('projectvault_claims');
+  localStorage.removeItem(getScopedLocalStorageKey('projectvault_claims'));
 }
 
 /**
