@@ -166,7 +166,7 @@ export async function uploadWorkspaceSourceFile(workspaceId: string, source: Sou
   });
   if(metadataError){await db.storage.from(bucket).remove([path]);throw metadataError;}
 }
-export async function subscribeWorkspaceChanges(workspaceId: string, onChange: () => void) {
+export function subscribeWorkspaceChanges(workspaceId: string, onChange: () => void) {
   const ws=requiredWorkspace(workspaceId);
   const channel=client().channel('pv-workspace-'+ws)
     .on('postgres_changes',{event:'*',schema:'public',table:'sources',filter:'workspace_id=eq.'+ws},onChange)
@@ -174,7 +174,7 @@ export async function subscribeWorkspaceChanges(workspaceId: string, onChange: (
     .on('postgres_changes',{event:'*',schema:'public',table:'conflicts',filter:'workspace_id=eq.'+ws},onChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'missing_info',filter:'workspace_id=eq.'+ws},onChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'questions',filter:'workspace_id=eq.'+ws},onChange);
-  await channel.subscribe();
+  channel.subscribe();
   return () => { void client().removeChannel(channel); };
 }
 
