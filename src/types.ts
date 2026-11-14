@@ -40,6 +40,11 @@ export interface Source {
   reconstructedAt?: string;
   author: string;
   repoBranch?: string;
+  githubOwner?: string;
+  githubRepo?: string;
+  githubUrl?: string;
+  commitSha?: string;
+  lastSyncedAt?: string;
   summary: string;
   rawExcerpt: string;
   extractedText?: string;
