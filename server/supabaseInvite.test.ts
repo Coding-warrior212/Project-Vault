@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import test from 'node:test';
 import express from 'express';
+import type { Express } from 'express';
 import { createInviteRouter, hashInviteCode, normalizeInviteCode } from './supabaseInvite';
 
 const USER_ID = '2d931510-d99f-494a-8c67-87feb05e1594';
 
-async function withServer(handler: express.Express, run: (url: string) => Promise<void>) {
+async function withServer(handler: Express, run: (url: string) => Promise<void>) {
   const server = createServer(handler);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
