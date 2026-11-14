@@ -1,0 +1,49 @@
+name: Round 3 verification
+
+on:
+  push:
+    branches:
+      - round3-development
+  pull_request:
+    branches:
+      - main
+      - round3-development
+
+permissions:
+  contents: read
+
+concurrency:
+  group: round3-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  application:
+    name: Server tests, typecheck, and production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run server security tests
+        run: npm run test:server
+      - name: Type-check application
+        run: npm run lint
+      - name: Build production assets
+        run: npm run build
+
+  database:
+    name: Local PostgreSQL 17 migration and adversarial smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Validate migration against disposable PostgreSQL 17
+        run: bash scripts/validate-db-local.sh
