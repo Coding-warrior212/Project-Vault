@@ -17,6 +17,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+// Render terminates TLS at one trusted proxy hop; this preserves the originating client IP for rate limits.
+app.set('trust proxy', 1);
 const PORT = Number(process.env.PORT) || 3000;
 
 // Keep the invite endpoint's small, dedicated JSON limit separate from document uploads.
