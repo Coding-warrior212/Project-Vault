@@ -73,13 +73,13 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
 
   // Reviewer notes & signoff state persisted in localStorage
   const [executiveNote, setExecutiveNote] = React.useState<string>(() => {
-    return cloud ? HANDOVER_TEMPLATE.summary : (localStorage.getItem(getScopedLocalStorageKey('projectvault_handover_exec_note') || HANDOVER_TEMPLATE.summary);
+    return cloud ? HANDOVER_TEMPLATE.summary : (localStorage.getItem(getScopedLocalStorageKey('projectvault_handover_exec_note')) || HANDOVER_TEMPLATE.summary);
   });
   const [approverName, setApproverName] = React.useState<string>(() => {
-    return cloud ? '' : (localStorage.getItem(getScopedLocalStorageKey('projectvault_handover_approver') || '');
+    return cloud ? '' : (localStorage.getItem(getScopedLocalStorageKey('projectvault_handover_approver')) || '');
   });
   const [finalComment, setFinalComment] = React.useState<string>(() => {
-    return cloud ? '' : (localStorage.getItem(getScopedLocalStorageKey('projectvault_handover_comment') || '');
+    return cloud ? '' : (localStorage.getItem(getScopedLocalStorageKey('projectvault_handover_comment')) || '');
   });
 
   // Approval checklist state
@@ -94,8 +94,8 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
   const [approvalError, setApprovalError] = React.useState<string | null>(null);
 
   const [isApproved, setIsApproved] = React.useState<boolean>(() => {
-    const persistedApproved = localStorage.getItem(getScopedLocalStorageKey('projectvault_handover_approved') === 'true';
-    const persistedApprover = localStorage.getItem(getScopedLocalStorageKey('projectvault_handover_approver') || '';
+    const persistedApproved = localStorage.getItem(getScopedLocalStorageKey('projectvault_handover_approved')) === 'true';
+    const persistedApprover = localStorage.getItem(getScopedLocalStorageKey('projectvault_handover_approver')) || '';
     return !cloud && persistedApproved && persistedApprover.trim().length > 0;
   });
 
