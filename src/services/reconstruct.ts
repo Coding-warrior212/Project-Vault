@@ -45,7 +45,8 @@ const inFlightExtractions = new Set<string>();
  */
 export async function extractKnowledgeFromSource(
   source: Source,
-  onProgress?: ExtractionProgressCallback
+  onProgress?: ExtractionProgressCallback,
+  persistLocally = true
 ): Promise<ReconstructResult> {
   if (inFlightExtractions.has(source.id)) {
     onProgress?.('error', 'Extraction for this source is already in progress.', 0);
@@ -135,11 +136,12 @@ export async function extractKnowledgeFromSource(
 
     onProgress?.('persisting', 'Persisting reconstructed claims into browser-side IndexedDB...', 92);
 
-    // Remove previous claims for this source to prevent duplicate pollution upon reprocessing
-    await deleteStoredClaimsBySourceId(source.id);
-
-    // Save newly reconstructed claims
-    await saveStoredClaims(claims);
+    // Local demo mode uses IndexedDB. Authenticated workspaces are persisted by the
+    // App callback through the workspace-scoped Supabase adapter instead.
+    if (persistLocally) {
+      await deleteStoredClaimsBySourceId(source.id);
+      await saveStoredClaims(claims);
+    }
 
     // Update source's claimsCount and reconstructStatus
     const updatedSource: Source = {
@@ -149,7 +151,7 @@ export async function extractKnowledgeFromSource(
       reconstructedAt: new Date().toISOString(),
       summary: data.summary || source.summary,
     };
-    await saveStoredSource(updatedSource);
+    if (persistLocally) await saveStoredSource(updatedSource);
 
     onProgress?.('completed', `Successfully reconstructed ${claims.length} evidence-grounded claims!`, 100);
 
