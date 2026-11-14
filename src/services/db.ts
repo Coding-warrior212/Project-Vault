@@ -644,6 +644,26 @@ export async function clearAllStoredSources(): Promise<void> {
 }
 
 /**
+ * Clear only the active Judge Demo persistence namespace while keeping the
+ * current browser session inside the demo. The dedicated IndexedDB database
+ * and prefixed localStorage keys leave the normal ProjectVault namespace intact.
+ */
+export async function clearJudgeDemoPersistence(): Promise<void> {
+  if (storageScope !== 'judge-demo') {
+    throw new Error('Judge Demo persistence can only be cleared while the Judge Demo scope is active.');
+  }
+
+  await clearAllStoredSources();
+
+  const keysToRemove: string[] = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (key?.startsWith('projectvault_judge_demo_')) keysToRemove.push(key);
+  }
+  keysToRemove.forEach((key) => localStorage.removeItem(key));
+}
+
+/**
  * Reset the browser-local judge/demo workspace without touching authenticated
  * Supabase workspaces. The caller must make the destructive action explicit.
  */
