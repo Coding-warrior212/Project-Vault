@@ -45,7 +45,7 @@ SELECT set_config('request.jwt.claim.sub', '', false);
 RESET ROLE;
 
 SET ROLE service_role;
-DO $
+DO $$
 DECLARE
   v_first record;
   v_retry record;
@@ -76,7 +76,7 @@ BEGIN
     RAISE EXCEPTION 'Invite retry must not increment uses_count again; found %', v_uses;
   END IF;
 END;
-$;
+$$;
 RESET ROLE;
 
 -- Verify a caller-settable GUC does not unlock demo writes, even for service_role.
