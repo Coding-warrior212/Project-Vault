@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { ArrowRight, CheckCircle2, Chrome, KeyRound, LockKeyhole, LogOut, Mail, ShieldCheck, Users } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { WorkspaceSessionProvider } from './WorkspaceSessionContext';
-import { resetLocalDemoData } from '../../services/db';
+import { resetLocalDemoData, setLocalStorageScope } from '../../services/db';
 
 type WorkspaceAccess = {
   id: string;
@@ -274,7 +274,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
           <div className="text-xs font-semibold text-amber-950"><span className="font-black tracking-wider">INTERACTIVE JUDGE DEMO</span><span className="mx-2 hidden sm:inline">·</span><span className="block font-normal sm:inline">This is a local demo session. Changes stay in this browser and never sync to team workspaces.</span></div>
           <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
             <button type="button" onClick={() => void handleResetDemo()} disabled={demoResetBusy} className="rounded-lg border border-amber-400 bg-white px-3 py-2 text-xs font-bold text-amber-950 hover:bg-amber-100 disabled:opacity-50">{demoResetBusy ? "Resetting…" : "Reset demo"}</button>
-            <button type="button" onClick={() => setDemoMode(false)} className="rounded-lg border border-amber-400 bg-white px-3 py-2 text-xs font-bold text-amber-950 hover:bg-amber-100">Exit demo</button>
+            <button type="button" onClick={() => { setLocalStorageScope('default'); setDemoMode(false); }} className="rounded-lg border border-amber-400 bg-white px-3 py-2 text-xs font-bold text-amber-950 hover:bg-amber-100">Exit demo</button>
           </div>
         </div>
         {children}
@@ -320,7 +320,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
         <div className="my-5 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />or continue with<span className="h-px flex-1 bg-slate-200" /></div>
         <button type="button" onClick={handleGoogleSignIn} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"><Chrome className="h-4 w-4" /> Continue with Google</button>
         <div className="my-5 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />or explore first<span className="h-px flex-1 bg-slate-200" /></div>
-        <button type="button" onClick={() => setDemoMode(true)} className="flex w-full items-center justify-center gap-2 rounded-xl border border-teal-300 bg-teal-50 px-4 py-3 text-sm font-bold text-teal-950 transition hover:bg-teal-100">Explore interactive demo <ArrowRight className="h-4 w-4" /></button>
+        <button type="button" onClick={() => { setLocalStorageScope('judge-demo'); setDemoMode(true); }} className="flex w-full items-center justify-center gap-2 rounded-xl border border-teal-300 bg-teal-50 px-4 py-3 text-sm font-bold text-teal-950 transition hover:bg-teal-100">Explore interactive demo <ArrowRight className="h-4 w-4" /></button>
         <p className="mt-4 text-center text-[11px] text-slate-500">Your workspace access is enforced by Supabase Row Level Security, not by client-side filtering alone.</p>
         <AuthFeedback error={error} message={message} />
       </AuthShell>
