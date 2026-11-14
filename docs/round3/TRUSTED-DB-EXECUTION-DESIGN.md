@@ -122,3 +122,29 @@ Do not let a general-purpose capability authorize unrelated tables or operations
 This document is a proposed design, not production SQL. Next work is to verify managed-role feasibility and PostgreSQL semantics, then write function/trigger bodies and the exact grant matrix. Run the migration on a disposable local Supabase stack and complete the adversarial matrix before any hosted migration.
 
 No hosted database, production secret, or deployment was changed by this document.
+
+
+## Migration implementation draft — 2026-11-14
+
+The first schema migration draft now implements the central capability mechanism in
+`supabase/migrations/202611140001_projectvault_round3.sql`:
+
+- Private `operation_capabilities` table keyed by PostgreSQL `xid8` transaction ID and a closed operation allow-list.
+- Private helper functions to check a capability, retrieve its actor, and mint a capability from already-trusted SECURITY DEFINER entry points.
+- No API-role schema usage, table privileges, or EXECUTE grants on private capability objects.
+- Replaced the original `projectvault.*` GUC bypasses for seed, owner-management, system-event, and claim-cleanup paths.
+- Activity events created by trusted RPCs derive the actor from the capability record.
+- Invite trigger blocks immutable invite-field edits, forged use counters, counter increments other than exactly +1 during redemption, revocation reversal, and physical deletion.
+- Explicit public-table grants are installed separately from RLS policies.
+
+### Static validation performed
+
+- SQL lexical scanner: balanced parentheses, closed string/dollar-quoted bodies, no unterminated comments.
+- 14 application table definitions, 60 policy definitions, 41 trigger definitions.
+- 25 SECURITY DEFINER functions were found; each function block contains a fixed search_path.
+- No remaining references to the original `projectvault.*` custom GUCs in the migration.
+- One top-level BEGIN/COMMIT pair.
+
+### Not yet proven
+
+This design still requires a disposable-database run to prove transaction-bound capability behavior through PostgREST, function ownership and grants on the managed Supabase roles, and concurrency properties. In particular, the last-owner invariant must be stress-tested with concurrent transactions. The static scanner is not a PostgreSQL parser and does not prove SQL execution correctness.
