@@ -575,6 +575,9 @@ export default function App() {
         // Trigger export action or scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
         break;
+      case 'graph':
+        setIsConnectModalOpen(true);
+        break;
       case 'settings':
         alert('Settings configuration saved for active session.');
         break;
