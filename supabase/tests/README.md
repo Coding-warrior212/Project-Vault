@@ -44,3 +44,20 @@ Run with actual Supabase JWTs and role contexts. Do not treat SQL Editor's postg
 ## Completion criteria
 
 Milestone 2 is complete only when the migration applies cleanly, automated assertions pass, adversarial tests pass, and Supabase Security/Performance/Health Advisors are reviewed. Capture test output and the final schema/types in the repository. Only then prepare the hosted migration for a separate controlled apply.
+
+
+## Zero-cost local PostgreSQL validation
+
+You do not need a paid Supabase branch for the first migration smoke test.
+
+From the repository root, with Docker Desktop installed and running:
+
+```bash
+bash scripts/validate-db-local.sh
+```
+
+The script starts a temporary PostgreSQL 17 container on the local machine, creates minimal stand-ins for Supabase Auth and Storage dependencies, applies the migration, runs schema assertions and runs a demo-lock/custom-GUC smoke test. The container is automatically removed on exit.
+
+The test uses no cloud database and does not change the hosted Supabase project. The first Docker run may download the PostgreSQL image.
+
+**Limitations:** local stubs cannot prove managed Supabase role ownership, PostgREST transaction behavior, OAuth/Google Auth, Realtime delivery, actual Storage API semantics, Edge Function behavior or production concurrency characteristics. Passing the local script is necessary but not sufficient for a production migration.
