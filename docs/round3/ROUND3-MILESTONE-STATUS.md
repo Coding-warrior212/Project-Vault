@@ -1,6 +1,6 @@
 # ProjectVault Round 3 — Milestone Status
 
-**Snapshot:** 2026-11-14 (Gemini fail-closed cleanup committed as `b8f43be`; local re-verification pending)  
+**Snapshot:** 2026-11-14 (server verification passed locally and in CI at `a005208`; AI-paused UI update `bdc60e6` awaits verification)  
 **Repository:** `Coding-warrior212/Project-Vault`  
 **Working branch:** `round3-development`  
 **Target:** preserve `main` and the hosted Supabase project until explicit release approval.
@@ -9,7 +9,7 @@
 
 The Round 3 branch contains the 14-table draft schema, RLS/triggers/RPCs, a local PostgreSQL 17 validation harness, a server-side invite redemption boundary, and automated CI. The workflow for commit `389a5d2` completed successfully: both application checks and PostgreSQL 17 migration/adversarial smoke-test jobs passed. The subsequent Gemini fail-closed change exposed TypeScript errors because legacy unreachable handler bodies remained below early returns. Commit `b8f43be` removes those obsolete bodies and the now-unused Gemini SDK/schema helpers; the endpoints remain explicitly unavailable (HTTP 503) until workspace authorization is implemented. Re-run CI and local checks for `b8f43be` before treating the cleanup as verified.
 
-The local PostgreSQL 17 migration and adversarial smoke harness has passed after the invite-replay SQL regression fix (user-reported terminal output). On the user's checkout at `4897a27`, server invite tests passed 5/5 and the Vite production build completed (1,681 modules; main JS chunk 962.13 KB, non-blocking size warning). TypeScript lint failed with 14 errors in legacy Gemini handler code; commit `b8f43be` removes that unreachable code. User-side verification of the new commit is pending. The connected Supabase project is active on PostgreSQL 17 but reports zero applied migrations; Security, Performance and Health Advisors currently return no findings on the empty schema. Those empty-schema results are not evidence that the proposed schema is secure.
+The local PostgreSQL 17 migration and adversarial smoke harness has passed after the invite-replay SQL regression fix (user-reported terminal output). On the user's checkout at `4897a27`, server invite tests passed 5/5 and the Vite production build completed (1,681 modules; main JS chunk 962.13 KB, non-blocking size warning). TypeScript lint failed with 14 errors in legacy Gemini handler code; commit `b8f43be` removes that unreachable code. User-side verification of `a005208` passed: invite tests 5/5, TypeScript lint zero errors, and Vite build succeeded (with a non-blocking large-chunk warning). The connected Supabase project is active on PostgreSQL 17 but reports zero applied migrations; Security, Performance and Health Advisors currently return no findings on the empty schema. Those empty-schema results are not evidence that the proposed schema is secure.
 
 No hosted migration, production data/schema change, deployment, PR merge, or secret modification has been performed.
 
@@ -70,3 +70,9 @@ Use only zero-cost local tooling and existing free allowances. Do not introduce 
 - Removed the unreachable legacy Gemini extraction and conflict-analysis implementations and their unused SDK/schema/helper code. This resolves the source of the TypeScript errors without weakening the fail-closed behavior.
 - Both Gemini POST endpoints still return HTTP 503 with `WORKSPACE_AUTHORIZATION_REQUIRED`; no Gemini calls or quota use can occur through these routes until verified session and workspace authorization are implemented.
 - The user's verification of `4897a27` reported 14 TypeScript errors in the unreachable legacy code. Server invite tests passed 5/5 and Vite build completed. Pull and re-run checks on `b8f43be`; no local pass is claimed yet.
+
+
+## Judge-facing AI availability disclosure (commit `bdc60e6`)
+
+- Updated the reconstruction modal to clearly state that AI reconstruction is temporarily unavailable until authenticated workspace authorization is implemented. The extraction action is visibly disabled rather than inviting users to submit documents to a route that correctly fails closed.
+- Existing knowledge review remains available. This is a user-experience honesty improvement, not completion of the AI/authentication milestone. Commit `bdc60e6` awaits local and CI verification.
