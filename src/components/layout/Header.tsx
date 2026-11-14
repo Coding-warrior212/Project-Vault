@@ -16,6 +16,7 @@ import { ThemeToggle } from './ThemeToggle';
 interface HeaderProps {
   currentPage: AppPage;
   currentWorkspace: Workspace;
+  isDemoWorkspace: boolean;
   onOpenMobileSidebar: () => void;
   onPrimaryAction: () => void;
   onNavigate: (page: AppPage) => void;
@@ -24,6 +25,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   currentPage,
   currentWorkspace,
+  isDemoWorkspace,
   onOpenMobileSidebar,
   onPrimaryAction,
   onNavigate,
@@ -115,7 +117,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Sample identity is shown only for seeded demo workspaces. */}
-      {currentWorkspace.id.startsWith('ws-') && (
+      {isDemoWorkspace && (
         <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-[#FFF4E3] dark:bg-[#14133B] border-2 border-[#25245F]/20 dark:border-[#55C7C2]/30 rounded-lg text-xs text-[#25245F] dark:text-[#FFF4E3] shadow-[2px_2px_0px_rgba(37,36,95,0.1)] dark:shadow-[2px_2px_0px_rgba(85,199,194,0.15)] transition-colors">
           <div className="w-2 h-2 rounded-full bg-[#F36B3F] animate-pulse" />
           <span className="font-bold tracking-wide">DEMO PROJECT</span>
