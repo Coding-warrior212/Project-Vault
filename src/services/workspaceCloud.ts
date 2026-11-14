@@ -219,3 +219,11 @@ export async function downloadWorkspaceSourceFile(workspaceId: string, sourceId:
   if(signedError)throw signedError; if(!signed?.signedUrl)throw new Error('A secure download link could not be created.');
   return {url:signed.signedUrl,filename:data.filename};
 }
+
+export async function findWorkspaceDuplicateSourceByHash(workspaceId: string, contentHash: string) {
+  const ws=requiredWorkspace(workspaceId);
+  const {data,error}=await client().from('sources').select('id,title,content_hash')
+    .eq('workspace_id',ws).eq('content_hash',contentHash).limit(1).maybeSingle();
+  if(error)throw error;
+  return data ? {id:data.id,title:data.title} : null;
+}
