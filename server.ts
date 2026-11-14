@@ -264,9 +264,12 @@ async function retryWithRateLimitBackoff<T>(operation: () => Promise<T>, maxRetr
  * API Route: Health & Configuration Check
  */
 app.get('/api/gemini/status', (_req: Request, res: Response) => {
+  // Never disclose whether a server-side provider secret is configured.
+  // AI routes remain unavailable until authenticated workspace authorization is wired end-to-end.
   res.json({
     status: 'ok',
-    hasKey: Boolean(apiKey),
+    available: false,
+    reason: 'workspace_authorization_required',
     model: 'gemini-3.8-flash',
     platform: 'ProjectVault Server-Side Engine',
     timestamp: new Date().toISOString(),
@@ -276,7 +279,14 @@ app.get('/api/gemini/status', (_req: Request, res: Response) => {
 /**
  * API Route: Reconstruct Knowledge from Document Text
  */
-app.post('/api/gemini/extract-knowledge', async (req: Request, res: Response) => {
+app.post('/api/gemini/extract-knowledge', async (_req: Request, res: Response) => {
+  // Fail closed: the current client has no authenticated session/workspace context.
+  // Do not let anonymous callers consume Gemini quota or submit arbitrary document data.
+  return res.status(503).json({
+    success: false,
+    error: 'AI extraction is temporarily unavailable until workspace authorization is enabled.',
+    code: 'WORKSPACE_AUTHORIZATION_REQUIRED',
+  });
   try {
     const { sourceId, sourceName, text, pages, fileType } = req.body;
 
@@ -514,7 +524,13 @@ CRITICAL RULES:
 /**
  * API Route: Analyze Knowledge Conflicts across Persisted Claims
  */
-app.post('/api/gemini/analyze-conflicts', async (req: Request, res: Response) => {
+app.post('/api/gemini/analyze-conflicts', async (_req: Request, res: Response) => {
+  // Fail closed until claims are loaded from an authorized workspace by the server.
+  return res.status(503).json({
+    success: false,
+    error: 'AI conflict analysis is temporarily unavailable until workspace authorization is enabled.',
+    code: 'WORKSPACE_AUTHORIZATION_REQUIRED',
+  });
   try {
     const { claims } = req.body;
     if (!claims || !Array.isArray(claims) || claims.length === 0) {
