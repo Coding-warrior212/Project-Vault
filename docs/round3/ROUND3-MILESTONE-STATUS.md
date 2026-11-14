@@ -47,9 +47,7 @@ No Supabase secrets are needed for these local tests. Do not add a real secret k
 
 ## Security gates that remain explicit
 
-- The existing Gemini extraction/conflict endpoints are not yet protected by the new authentication boundary. Do not treat the current hosted app as a multi-tenant secure deployment until this is fixed and verified.
-- The app still has no Supabase Auth UI or cloud persistence adapter; the SQL migration is not yet an integrated production application.
-- The existing Gemini extraction/conflict endpoints remain unauthenticated and can consume the server-side Gemini quota. Protect them with verified non-demo sessions and workspace contributor checks before treating the app as a secure multi-user deployment.
+- The Gemini extraction/conflict endpoints in `server.ts` still accept requests without a verified Supabase session or workspace authorization; the current frontend calls them without an auth token. This exposes server-side Gemini quota and is a release-blocking security issue. The app also has no Supabase Auth UI or cloud persistence adapter, so the SQL migration is not yet an integrated production application. Do not present the current hosted app as a secure multi-tenant deployment until session verification, workspace contributor authorization, frontend session wiring, and negative tests are complete.
 - Storage UPDATE is deliberately denied. Same-key upsert/replacement is unsupported until a constrained update policy is designed and tested; keep the current fail-closed policy meanwhile.
 - The local PostgreSQL stubs do not prove Supabase-managed Auth, PostgREST, Storage, Realtime, key handling, or role behavior.
 - The hosted project must remain unchanged until the disposable-environment gates pass and a separate explicit production approval is given.
