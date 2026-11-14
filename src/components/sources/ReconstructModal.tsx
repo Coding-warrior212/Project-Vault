@@ -104,7 +104,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
                   Stage 2 · RECONSTRUCT
                 </span>
                 <span className="text-[10px] font-mono font-bold text-[#F36B3F] bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded border border-orange-200 dark:border-orange-900/40">
-                  Gemini 3.8 Flash
+                  AI reconstruction (temporarily unavailable)
                 </span>
               </div>
               <h2 className="text-base font-bold text-neutral-900 dark:text-[#FFF4E3] mt-0.5">
@@ -178,7 +178,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
                 Evidence Traceability & Untrusted Data Safeguard
               </span>
               <p className="text-[11px] text-neutral-600 dark:text-[#C4C3E0] leading-relaxed">
-                Document text is sent to Gemini as passive data through our secure server gateway. Every extracted claim is required to be substantiated by an exact verbatim quote and page/line locator. All newly synthesized claims enter the Knowledge Ledger marked <strong className="font-semibold text-amber-700 dark:text-amber-300">UNVERIFIED</strong> for human review.
+                AI reconstruction is temporarily disabled while authenticated workspace authorization is being completed. This fail-closed safeguard prevents unauthenticated document submission and provider quota use. Existing claims remain available for human review; do not interpret sample claims as newly AI-verified evidence.
               </p>
             </div>
           </div>
@@ -191,18 +191,20 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
               </div>
               <div className="max-w-md mx-auto space-y-1">
                 <h4 className="font-bold text-neutral-900 dark:text-[#FFF4E3] text-sm">
-                  Ready to Reconstruct Knowledge
+                  AI Reconstruction Temporarily Paused
                 </h4>
                 <p className="text-xs text-neutral-500 dark:text-[#8E8DAF] leading-relaxed">
-                  Gemini 3.8 Flash will inspect architectural decisions, technical specifications, system components, action items, risks, and operational parameters.
+                  This capability will return after ProjectVault can verify your sign-in and workspace permissions on the server. You can continue reviewing existing knowledge claims and source evidence.
                 </p>
               </div>
               <button
-                onClick={handleStartExtraction}
-                className="px-6 py-2.5 text-xs font-bold text-white bg-[#F36B3F] hover:bg-[#E0572C] rounded-lg border-2 border-[#F36B3F] shadow-[3px_3px_0px_#25245F] dark:shadow-[3px_3px_0px_#55C7C2] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer inline-flex items-center gap-2"
+                type="button"
+                disabled
+                title="Unavailable until authenticated workspace authorization is implemented"
+                className="px-6 py-2.5 text-xs font-bold text-neutral-500 bg-neutral-200 dark:bg-[#25245F] rounded-lg border-2 border-neutral-300 dark:border-[#2D2C68] cursor-not-allowed inline-flex items-center gap-2 opacity-80"
               >
-                <Sparkles className="w-4 h-4" />
-                <span>{isReprocessing ? 'Start Reprocessing Source' : 'Reconstruct Knowledge Claims'}</span>
+                <ShieldAlert className="w-4 h-4" />
+                <span>Temporarily unavailable</span>
               </button>
             </div>
           )}
@@ -214,7 +216,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
                 <div className="flex items-center gap-2.5">
                   <div className="w-6 h-6 rounded-full border-2 border-[#F36B3F] border-t-transparent animate-spin" />
                   <span className="font-bold text-neutral-900 dark:text-[#FFF4E3] text-xs">
-                    Reconstructing Knowledge with Gemini...
+                    AI reconstruction is currently disabled
                   </span>
                 </div>
                 <span className="font-mono text-xs font-bold text-[#F36B3F]">{progressPercent}%</span>
@@ -351,7 +353,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
         <div className="p-4 border-t-2 border-neutral-200 dark:border-[#2D2C68] flex items-center justify-between bg-neutral-50/70 dark:bg-[#14133B]/60">
           <div className="text-xs text-neutral-500 dark:text-[#8E8DAF] flex items-center gap-1.5">
             <Cpu className="w-3.5 h-3.5 text-[#55C7C2]" />
-            <span>AI Studio Engine · Model: gemini-2.5-flash</span>
+            <span>Workspace authorization required · AI paused</span>
           </div>
 
           <div className="flex items-center gap-2">
