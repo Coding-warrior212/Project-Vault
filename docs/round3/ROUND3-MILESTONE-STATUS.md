@@ -1,13 +1,13 @@
 # ProjectVault Round 3 — Milestone Status
 
-**Snapshot:** 2026-11-14 (updated after commit `5df3105`)  
+**Snapshot:** 2026-11-14 (local validation confirmed; CI workflow added)  
 **Repository:** `Coding-warrior212/Project-Vault`  
 **Working branch:** `round3-development`  
 **Target:** preserve `main` and the hosted Supabase project until explicit release approval.
 
 ## Executive status
 
-The Round 3 branch is **ahead of `main` and 0 behind** at this snapshot. The branch contains the 14-table draft schema, RLS/triggers/RPCs, a local PostgreSQL 17 validation harness, and a new server-side invite redemption boundary.
+The Round 3 branch was verified at **52 commits ahead of `main` and 0 behind** before the latest CI workflow commit. The branch contains the 14-table draft schema, RLS/triggers/RPCs, a local PostgreSQL 17 validation harness, and a new server-side invite redemption boundary.
 
 The local PostgreSQL 17 migration and adversarial smoke harness has passed after the invite-replay SQL regression fix (user-reported terminal output). The server invite suite passed 5/5; TypeScript lint (`tsc --noEmit`) passed; and the Vite production build completed successfully (1,681 modules). The build emitted non-blocking warnings for `__dirname` compatibility with Vite's future native config loader and a JavaScript chunk above 500 KB. The connected Supabase project is active on PostgreSQL 17 but reports zero applied migrations; Security, Performance and Health Advisors currently return no findings on the empty schema. Those empty-schema results are not evidence that the proposed schema is secure.
 
@@ -17,7 +17,7 @@ No hosted migration, production data/schema change, deployment, PR merge, or sec
 
 | # | Milestone | Current status | Verified progress | Remaining blockers / acceptance evidence |
 |---|---|---|---|---|
-| 1 | Development foundation | In progress | `round3-development` exists; draft PR #1 remains unmerged; schema review, local validation scripts and documentation are committed. Commit `5df3105` updates esbuild to `^0.28.2` for Vite 8 compatibility. Local TypeScript lint and production build pass; working tree was clean after the commit. | Review the remaining branch diff and retain a reproducible baseline; resolve non-blocking Vite config/chunk warnings when safely justified. |
+| 1 | Development foundation | In progress | `round3-development` exists; draft PR #1 remains unmerged; local server tests (5/5), TypeScript lint, Vite build, and PostgreSQL 17 migration smoke tests pass on the user's WSL machine. Added `.github/workflows/round3-verification.yml` to run application and disposable-PostgreSQL checks on pushes/PRs. | Wait for GitHub Actions to execute the new workflow; review remaining branch diff and resolve non-blocking Vite config/chunk warnings when safely justified. |
 | 2 | Supabase foundation | Open — not signed off | 14-table migration and RLS/security assertions are drafted. PostgreSQL 17 local migration/adversarial smoke harness passed; invite route tests passed 5/5. Hosted project remains at zero migrations and is unchanged. Empty-schema Security/Performance/Health Advisors report no findings. | Verify managed Supabase roles, RPC ownership/grants, PostgREST transaction capabilities, Storage, Auth and Realtime on an approved disposable environment. Review advisors again after schema exists. Define file replacement semantics. |
 | 3 | Authentication and RBAC | In progress — not complete | Five-role policy model and service-role-only invite RPC are in the draft migration. Invite route validates the user through Supabase Auth, rejects anonymous users, derives the user ID from Auth, hashes codes server-side and calls the RPC with the server-only secret key. | Add frontend Email/Password + Google Auth, session lifecycle, profile/workspace loading, invite creation/revocation APIs and UI, and full role-based route guards. Execute tests. |
 | 4 | Cloud persistence and realtime | Not started | Local IndexedDB/localStorage remains available; draft cloud schema exists. | Implement Supabase data adapter and Storage upload/download/delete, idempotent local-to-cloud importer with orphan filtering and row-count verification, Realtime subscriptions, and preserve existing local data until verified. |
@@ -27,6 +27,8 @@ No hosted migration, production data/schema change, deployment, PR merge, or sec
 | 8 | Final deployment and submission | Not ready | Existing app and repository links are recorded in project context. | Only after gates pass: controlled deployment, production migration approval, end-to-end smoke test, updated project PDF, improvements list, technical details, testing notes and team contributions. |
 
 ## New branch work in this snapshot
+
+- `.github/workflows/round3-verification.yml` (commit `eacbf15`): adds CI jobs for Node 22 locked install, invite server tests, TypeScript lint, Vite production build, and the disposable PostgreSQL 17 migration/assertion/adversarial smoke harness. Workflow run has not yet been observed; do not count CI as passing until GitHub reports successful runs.
 
 - `server/supabaseInvite.ts`: dedicated small-body invite route; Supabase Auth user validation; explicit non-anonymous check; SHA-256 invite hash; service-only RPC call using the secret key on the `apikey` header; bounded per-IP in-memory limiter; request timeouts; sanitized errors.
 - `server/supabaseInvite.test.ts`: code normalization/hash, authenticated identity derivation, no secret Bearer header, anonymous-user rejection and missing-session tests.
@@ -44,10 +46,10 @@ For a fresh reproducibility check after pulling the latest branch, on the user's
 ```bash
 git switch round3-development
 git pull origin round3-development
-npm ci
-npm run test:server
-npm run lint
-npm run build
+/usr/bin/node /usr/share/nodejs/npm/bin/npm-cli.js ci
+/usr/bin/node /usr/share/nodejs/npm/bin/npm-cli.js run test:server
+/usr/bin/node /usr/share/nodejs/npm/bin/npm-cli.js run lint
+/usr/bin/node /usr/share/nodejs/npm/bin/npm-cli.js run build
 bash scripts/validate-db-local.sh
 ```
 
