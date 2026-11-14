@@ -511,10 +511,11 @@ export default function App() {
       if (activeWorkspaceId) await deleteWorkspaceSource(activeWorkspaceId, sourceId);
       else await deleteStoredSource(sourceId);
     } catch (err) {
-      console.warn('Error deleting stored source:', err);
+      console.error('Error deleting source from workspace persistence:', err);
+      throw err;
     }
 
-    // Clean up in-memory state
+    // Only update in-memory state after persistent deletion succeeds.
     setSources((prev) => prev.filter((s) => s.id !== sourceId));
     setClaims((prev) => prev.filter((c) => c.sourceId !== sourceId));
 
