@@ -148,7 +148,14 @@ export async function appendWorkspaceActivity(workspaceId: string, event: Activi
 }
 export async function deleteWorkspaceSource(workspaceId: string, sourceId: string) {
   const ws=requiredWorkspace(workspaceId);
-  const {error}=await client().from('sources').delete().eq('workspace_id',ws).eq('id',sourceId);
+  const db=client();
+  const {data:files,error:fileReadError}=await db.from('source_files').select('storage_bucket,storage_path').eq('workspace_id',ws).eq('source_id',sourceId);
+  if(fileReadError)throw fileReadError;
+  for(const file of files ?? []){
+    const {error:storageError}=await db.storage.from(file.storage_bucket).remove([file.storage_path]);
+    if(storageError)throw storageError;
+  }
+  const {error}=await db.from('sources').delete().eq('workspace_id',ws).eq('id',sourceId);
   if(error)throw error;
 }
 export async function uploadWorkspaceSourceFile(workspaceId: string, source: Source, file: File) {
@@ -157,14 +164,14 @@ export async function uploadWorkspaceSourceFile(workspaceId: string, source: Sou
   const path=ws+'/'+source.id+'/'+crypto.randomUUID()+'-'+safeName;
   const bucket='projectvault-sources';
   const {error:uploadError}=await db.storage.from(bucket).upload(path,file,{contentType:file.type || 'application/octet-stream',upsert:false});
-  if(uploadError)throw uploadError;
+  if(uploadError){ await db.from('sources').delete().eq('workspace_id',ws).eq('id',source.id); throw uploadError; }
   const {data:{user}}=await db.auth.getUser();
-  if(!user){await db.storage.from(bucket).remove([path]);throw new Error('Your session expired. Sign in again.');}
+  if(!user){await db.storage.from(bucket).remove([path]);await db.from('sources').delete().eq('workspace_id',ws).eq('id',source.id);throw new Error('Your session expired. Sign in again.');}
   const {error:metadataError}=await db.from('source_files').insert({
     workspace_id:ws,source_id:source.id,storage_bucket:bucket,storage_path:path,
     filename:file.name,mime_type:file.type || 'application/octet-stream',size_bytes:file.size,created_by:user.id,
   });
-  if(metadataError){await db.storage.from(bucket).remove([path]);throw metadataError;}
+  if(metadataError){await db.storage.from(bucket).remove([path]);await db.from('sources').delete().eq('workspace_id',ws).eq('id',source.id);throw metadataError;}
 }
 export function subscribeWorkspaceChanges(workspaceId: string, onChange: () => void) {
   const ws=requiredWorkspace(workspaceId);
@@ -206,7 +213,7 @@ export async function saveWorkspaceHandover(workspaceId: string, draft: {
     ? await db.from('handovers').update(payload).eq('workspace_id',ws).eq('id',existing.id)
     : await db.from('handovers').insert(payload);
   if(result.error)throw result.error;
-  if(draft.isApproved) await appendWorkspaceActivity(ws,{id:'act-'+crypto.randomUUID(),type:'handover_drafted',
+  if(draft.isApproved) await appendWorkspaceActivity(ws,{id:'act-'+crypto.randomUUID(),type:'handover_approved',
     timestamp:'Just now',title:'Handover approved',description:'Human reviewer approved the workspace handover dossier.',
     actor:draft.approvedBy});
 }
