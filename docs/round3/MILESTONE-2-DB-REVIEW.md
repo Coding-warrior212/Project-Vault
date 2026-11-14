@@ -90,3 +90,34 @@ The current Supabase changelog states that new public tables are no longer autom
 ## Decision
 
 **Do not apply the proposed SQL yet.** The database is currently empty and unchanged. The architecture is a useful schema baseline, but the forgeable GUC bypasses and missing explicit Data API privilege plan are release-blocking. Next implementation step is to revise the trusted execution boundary and privilege matrix, then produce a single reviewed migration and test it locally before any hosted application.
+
+
+## 2026-11-14 execution update
+
+A first draft migration is now committed at:
+`supabase/migrations/202611140001_projectvault_round3.sql`
+
+A read-only schema assertion suite is committed at:
+`supabase/tests/round3_schema_assertions.sql`
+
+Static inspection of the committed migration confirms:
+- 14 application table definitions.
+- 15 RLS-enable statements (14 application tables plus the private capability table).
+- 60 policy definitions (including Storage policies).
+- 41 trigger definitions.
+- No remaining references to caller-settable `projectvault.*` custom GUCs in the migration.
+- One explicit transaction boundary around schema and seed work.
+- Private transaction-bound operation capability helpers.
+- Invite lifecycle trigger protecting immutable fields, one-way revocation, and redemption-only +1 use counter changes.
+- Internal activity-event actor is taken from the transaction-bound capability rather than an arbitrary event payload.
+
+**These are static checks only.** The migration has not been executed. The assertion suite has not been run. Function ownership, transaction-ID capability semantics under actual PostgREST transaction behavior, RLS/grants, trigger ordering, concurrent owner-removal behavior, and Storage access must still pass on a disposable Supabase database before any hosted apply.
+
+### Required validation gates
+1. Apply migration to a disposable Supabase branch.
+2. Run `supabase/tests/round3_schema_assertions.sql`.
+3. Execute adversarial tests using anon, authenticated, and service_role contexts, including custom-GUC attempts, invite tampering/replay/races, demo writes, cross-workspace references, and owner-removal races.
+4. Inspect Security, Performance, and Health Advisors.
+5. Only then review and authorize applying the migration to the hosted project.
+
+The temporary Supabase validation branch was quoted at **$0.01344/hour**. Creation is waiting for explicit cost approval.
