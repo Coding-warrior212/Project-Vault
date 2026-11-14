@@ -72,7 +72,7 @@ BEGIN
   SELECT uses_count INTO v_uses
   FROM public.workspace_invites
   WHERE code_hash = encode(digest('PV-AB12-CD34', 'sha256'), 'hex');
-  IF v_uses <> 1 THEN
+  IF v_uses IS DISTINCT FROM 1 THEN
     RAISE EXCEPTION 'Invite retry must not increment uses_count again; found %', v_uses;
   END IF;
 END;
