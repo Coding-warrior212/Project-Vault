@@ -49,7 +49,7 @@
 - Demo source files, claims, review state, and handover notes use a separate browser-local IndexedDB database, localStorage key namespace, and in-memory fallback.
 - Reset clears only the Judge Demo namespace. It surfaces an error if the isolated IndexedDB database cannot be cleared; Exit Demo returns to the normal local storage scope.
 - The app's sample data is reloaded when the demo is entered again after reset.
-- Browser-level verification of isolation, reset, and the full interaction path remains open.
+- Browser verification completed for the interactive Judge Demo path: entering the demo, adding a user source, exercising claim review/conflict resolution/missing-info/question workflows, generating and approving a handover, copying/downloading the dossier, refreshing persisted demo changes, and resetting back to the original sample dataset. The reset regression was reproduced (a user-added Fastify source survived the old reset), fixed, pulled locally, and re-tested successfully; the user confirmed the post-fix reset passed. Preservation of unrelated pre-existing default-scope browser records remains a separate isolation check.
 
 ## Security design
 - Browser code uses only the Supabase publishable key.
@@ -73,7 +73,7 @@ The local Supabase Auth lifecycle test previously passed signup, password login,
 - The hosted Supabase project has not been linked or migrated; no hosted schema/data changes have been made.
 - Google OAuth provider configuration has not been verified in the Supabase dashboard.
 - AI extraction and conflict analysis remain disabled pending secure server-side authorization.
-- The interactive judge demo's storage isolation and reset logic are implemented and covered by namespace unit tests; browser verification of entry, edits across supported workflows, reset-to-seed behavior, and preservation of pre-existing browser-local records remains open. A final reset-error propagation guard was added after run #43620652179 and still needs a local re-check.
+- The interactive judge demo's entry, supported review/handover interactions, refresh persistence, and reset-to-seed behavior have now passed browser checks. A separate browser check that pre-existing default-scope records remain unchanged across entering/exiting/resetting Judge Demo is still open.
 - GitHub private-repository OAuth and scheduled/background sync are not included.
 - The knowledge graph is source-to-claim evidence tracing, not full graph-node/edge persistence or automatic dependency propagation.
 - Deployment, PR merge, production migration, final PDF refresh, and submission have not been performed.
