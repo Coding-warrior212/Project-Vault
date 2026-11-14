@@ -111,6 +111,7 @@ export function createInviteRouter(options: InviteRouterOptions = {}) {
           p_code_hash: hashInviteCode(code),
         }),
         cache: 'no-store',
+        signal: AbortSignal.timeout(10000),
       });
 
       if (!rpcResponse.ok) {
