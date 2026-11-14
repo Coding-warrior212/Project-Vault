@@ -37,7 +37,7 @@ export function createInviteRouter(options: InviteRouterOptions = {}) {
   const windowMs = options.windowMs ?? 15 * 60 * 1000;
   const attempts = new Map<string, AttemptWindow>();
 
-  router.post('/api/workspaces/redeem-invite', async (req: Request, res: Response) => {
+  router.post('/api/workspaces/redeem-invite', express.json({ limit: '2kb' }), async (req: Request, res: Response) => {
     const now = Date.now();
     const clientKey = req.ip || req.socket.remoteAddress || 'unknown';
     let window = attempts.get(clientKey);
@@ -86,6 +86,7 @@ export function createInviteRouter(options: InviteRouterOptions = {}) {
           Accept: 'application/json',
         },
         cache: 'no-store',
+        signal: AbortSignal.timeout(10000),
       });
 
       if (!authResponse.ok) {
