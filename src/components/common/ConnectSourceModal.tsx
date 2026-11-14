@@ -27,7 +27,7 @@ import {
 } from '../../services/extractor';
 import { saveStoredSource, saveStoredFile, findDuplicateSourceByHash } from '../../services/db';
 import { useWorkspaceSession } from '../auth/WorkspaceSessionContext';
-import { saveWorkspaceSource, uploadWorkspaceSourceFile } from '../../services/workspaceCloud';
+import { findWorkspaceDuplicateSourceByHash, saveWorkspaceSource, uploadWorkspaceSourceFile } from '../../services/workspaceCloud';
 
 interface ConnectSourceModalProps {
   isOpen: boolean;
@@ -98,7 +98,9 @@ export const ConnectSourceModal: React.FC<ConnectSourceModalProps> = ({
       setIsProcessing(true);
       try {
         const hash = await computeFileHash(selectedFile);
-        const duplicate = await findDuplicateSourceByHash(hash);
+        const duplicate = cloud
+          ? await findWorkspaceDuplicateSourceByHash(cloud.workspace.id, hash)
+          : await findDuplicateSourceByHash(hash);
         if (duplicate) {
           setErrorMessage(`File "${selectedFile.name}" is already ingested in ProjectVault ("${duplicate.title}"). Duplicate prevented.`);
           setIsProcessing(false);
