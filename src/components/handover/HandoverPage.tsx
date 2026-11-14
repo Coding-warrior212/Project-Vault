@@ -136,7 +136,11 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
     });
     setApprovalError(null);
     setIsApproved(false);
-    localStorage.setItem('projectvault_handover_approved', 'false');
+    if (!cloud) localStorage.setItem('projectvault_handover_approved', 'false');
+    else void saveWorkspaceHandover(cloud.workspace.id, {
+      title: HANDOVER_TEMPLATE.title, executiveNote, finalComment, checklist,
+      isApproved: false, approvedBy: '',
+    }).catch((error) => setApprovalError(error instanceof Error ? error.message : 'Approval invalidation could not be saved.'));
   };
 
   const allChecklistItemsChecked = Object.values(checklist).every(Boolean);
