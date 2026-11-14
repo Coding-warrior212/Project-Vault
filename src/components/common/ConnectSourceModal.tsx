@@ -26,6 +26,8 @@ import {
   sanitizeFilename,
 } from '../../services/extractor';
 import { saveStoredSource, saveStoredFile, findDuplicateSourceByHash } from '../../services/db';
+import { useWorkspaceSession } from '../auth/WorkspaceSessionContext';
+import { saveWorkspaceSource, uploadWorkspaceSourceFile } from '../../services/workspaceCloud';
 
 interface ConnectSourceModalProps {
   isOpen: boolean;
@@ -38,6 +40,7 @@ export const ConnectSourceModal: React.FC<ConnectSourceModalProps> = ({
   onClose,
   onAddSource,
 }) => {
+  const cloud = useWorkspaceSession();
   const [activeTab, setActiveTab] = React.useState<'upload' | 'github' | 'paste'>('upload');
   const [title, setTitle] = React.useState('');
   const [repoUrl, setRepoUrl] = React.useState('github.com/apex-fleet/safety-monitor');
@@ -133,8 +136,13 @@ export const ConnectSourceModal: React.FC<ConnectSourceModalProps> = ({
           tags: ['User Upload', 'IndexedDB'],
         };
 
-        await saveStoredSource(newSource);
-        await saveStoredFile(sourceId, selectedFile);
+        if (cloud) {
+          await saveWorkspaceSource(cloud.workspace.id, newSource);
+          await uploadWorkspaceSourceFile(cloud.workspace.id, newSource, selectedFile);
+        } else {
+          await saveStoredSource(newSource);
+          await saveStoredFile(sourceId, selectedFile);
+        }
 
         onAddSource(newSource);
         onClose();
@@ -187,8 +195,13 @@ export const ConnectSourceModal: React.FC<ConnectSourceModalProps> = ({
           tags: ['Pasted Text', 'User Upload', 'IndexedDB'],
         };
 
-        await saveStoredSource(newSource);
-        await saveStoredFile(sourceId, textFile);
+        if (cloud) {
+          await saveWorkspaceSource(cloud.workspace.id, newSource);
+          await uploadWorkspaceSourceFile(cloud.workspace.id, newSource, textFile);
+        } else {
+          await saveStoredSource(newSource);
+          await saveStoredFile(sourceId, textFile);
+        }
 
         onAddSource(newSource);
         onClose();
@@ -402,7 +415,7 @@ export const ConnectSourceModal: React.FC<ConnectSourceModalProps> = ({
           <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950/30 rounded-lg border-2 border-emerald-300 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-300 flex items-start gap-2 text-[11px] leading-relaxed">
             <HardDrive className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
             <div>
-              <strong>IndexedDB Persistence:</strong> Ingested files and extracted text are stored in your local browser IndexedDB. Data persists across reloads and stays private to your machine.
+              {cloud ? <><strong>Private workspace storage:</strong> Files are uploaded to the selected workspace's private Supabase Storage bucket. Access is enforced by workspace membership policies.</> : <><strong>Local demo persistence:</strong> Ingested files and extracted text stay in this browser's IndexedDB.</>}
             </div>
           </div>
 
