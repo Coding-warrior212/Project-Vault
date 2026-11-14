@@ -1,6 +1,6 @@
 # ProjectVault Round 3 — Milestone Status
 
-**Snapshot:** 2026-11-14  
+**Snapshot:** 2026-11-14 (updated after commit `5df3105`)  
 **Repository:** `Coding-warrior212/Project-Vault`  
 **Working branch:** `round3-development`  
 **Target:** preserve `main` and the hosted Supabase project until explicit release approval.
@@ -9,7 +9,7 @@
 
 The Round 3 branch is **ahead of `main` and 0 behind** at this snapshot. The branch contains the 14-table draft schema, RLS/triggers/RPCs, a local PostgreSQL 17 validation harness, and a new server-side invite redemption boundary.
 
-The user previously ran the local PostgreSQL 17 harness successfully. That PASS predates the latest invite-replay SQL regression and must be repeated. The connected Supabase project currently reports zero migrations and zero tables in `public`/`private`; its empty-schema Security Advisor result is not evidence that the proposed schema is secure.
+The local PostgreSQL 17 migration and adversarial smoke harness has passed after the invite-replay SQL regression fix (user-reported terminal output). The server invite suite passed 5/5; TypeScript lint (`tsc --noEmit`) passed; and the Vite production build completed successfully (1,681 modules). The build emitted non-blocking warnings for `__dirname` compatibility with Vite's future native config loader and a JavaScript chunk above 500 KB. The connected Supabase project is active on PostgreSQL 17 but reports zero applied migrations; Security, Performance and Health Advisors currently return no findings on the empty schema. Those empty-schema results are not evidence that the proposed schema is secure.
 
 No hosted migration, production data/schema change, deployment, PR merge, or secret modification has been performed.
 
@@ -17,8 +17,8 @@ No hosted migration, production data/schema change, deployment, PR merge, or sec
 
 | # | Milestone | Current status | Verified progress | Remaining blockers / acceptance evidence |
 |---|---|---|---|---|
-| 1 | Development foundation | In progress | `round3-development` exists; draft PR #1 remains unmerged; schema review, local validation scripts and documentation are committed. | Complete repository build/type checks, review branch diff and retain a clean reproducible baseline. |
-| 2 | Supabase foundation | Open — not signed off | 14-table migration and RLS/security assertions are drafted. PostgreSQL 17 local harness passed before the latest SQL regression. Server invite redemption route and focused tests are committed. | Re-run local SQL and Node tests; verify managed Supabase roles, RPC ownership/grants, PostgREST transaction capabilities, Storage, Auth, Realtime and all advisors on an approved disposable environment. Define file replacement semantics. |
+| 1 | Development foundation | In progress | `round3-development` exists; draft PR #1 remains unmerged; schema review, local validation scripts and documentation are committed. Commit `5df3105` updates esbuild to `^0.28.2` for Vite 8 compatibility. Local TypeScript lint and production build pass; working tree was clean after the commit. | Review the remaining branch diff and retain a reproducible baseline; resolve non-blocking Vite config/chunk warnings when safely justified. |
+| 2 | Supabase foundation | Open — not signed off | 14-table migration and RLS/security assertions are drafted. PostgreSQL 17 local migration/adversarial smoke harness passed; invite route tests passed 5/5. Hosted project remains at zero migrations and is unchanged. Empty-schema Security/Performance/Health Advisors report no findings. | Verify managed Supabase roles, RPC ownership/grants, PostgREST transaction capabilities, Storage, Auth and Realtime on an approved disposable environment. Review advisors again after schema exists. Define file replacement semantics. |
 | 3 | Authentication and RBAC | In progress — not complete | Five-role policy model and service-role-only invite RPC are in the draft migration. Invite route validates the user through Supabase Auth, rejects anonymous users, derives the user ID from Auth, hashes codes server-side and calls the RPC with the server-only secret key. | Add frontend Email/Password + Google Auth, session lifecycle, profile/workspace loading, invite creation/revocation APIs and UI, and full role-based route guards. Execute tests. |
 | 4 | Cloud persistence and realtime | Not started | Local IndexedDB/localStorage remains available; draft cloud schema exists. | Implement Supabase data adapter and Storage upload/download/delete, idempotent local-to-cloud importer with orphan filtering and row-count verification, Realtime subscriptions, and preserve existing local data until verified. |
 | 5 | Three promised improvements | Not complete | Draft tables include workspace collaboration and graph nodes/edges. | Connect shared workspaces to live app state; implement user-authorized GitHub repository sync; implement graph construction and evidence-linked change-impact/staleness propagation. |
@@ -35,11 +35,11 @@ No hosted migration, production data/schema change, deployment, PR merge, or sec
 - Migration RPC: fixes retry idempotency at the final invite-use boundary; local SQL smoke test now checks that a repeated redemption by the same user returns the existing membership and does not increment the counter twice.
 - `.env.example`: documents `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and server-only `SUPABASE_SECRET_KEY`.
 
-These changes are **committed but not yet runtime-verified** in this environment.
+The invite endpoint behavior is locally verified by the 5-test suite. The production route is not yet wired to a sign-in/invite UI or validated against a real Supabase Auth/PostgREST environment.
 
 ## Immediate user action needed
 
-The latest SQL and Node tests cannot be executed from this remote repository review session. On the user's Ubuntu WSL terminal, in the cloned repository:
+For a fresh reproducibility check after pulling the latest branch, on the user's Ubuntu WSL terminal, in the cloned repository:
 
 ```bash
 git switch round3-development
@@ -51,7 +51,7 @@ npm run build
 bash scripts/validate-db-local.sh
 ```
 
-Send the complete output, especially any failing test or TypeScript error. This is local-only validation; do not connect the test command to the hosted Supabase project.
+The previous run passed: server tests 5/5, lint, production build, and local PostgreSQL 17 migration/smoke harness. Re-run these after subsequent code changes. This is local-only validation; do not connect the test command to the hosted Supabase project.
 
 No Supabase secrets are needed for these local tests. Do not add a real secret key to Git, `.env.example`, Vite-prefixed variables, or the browser bundle.
 
