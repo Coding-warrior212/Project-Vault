@@ -52,7 +52,7 @@
 
 ## Verification evidence
 
-The latest GitHub Actions run for the current branch passed:
+The latest completed GitHub Actions verification before the judge-demo namespace changes passed:
 - Server security tests: **7/7**
 - TypeScript type-check: **pass**
 - Vite production build: **pass**
@@ -65,7 +65,7 @@ The local Supabase Auth lifecycle test previously passed signup, password login,
 - The hosted Supabase project has not been linked or migrated; no hosted schema/data changes have been made.
 - Google OAuth provider configuration has not been verified in the Supabase dashboard.
 - AI extraction and conflict analysis remain disabled pending secure server-side authorization.
-- A dedicated one-click, seeded, read-only judge-demo mode is not yet complete.
+- The judge demo is interactive and storage-namespaced in code, but it still needs browser verification of entry, edits across all supported workflows, reset-to-seed behavior, and proof that pre-existing browser-local records remain unchanged.
 - GitHub private-repository OAuth and scheduled/background sync are not included.
 - The knowledge graph is source-to-claim evidence tracing, not full graph-node/edge persistence or automatic dependency propagation.
 - Deployment, PR merge, production migration, final PDF refresh, and submission have not been performed.
