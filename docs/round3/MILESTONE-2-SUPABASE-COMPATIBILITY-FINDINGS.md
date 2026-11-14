@@ -94,3 +94,11 @@ The development migration now checks existing membership before enforcing the us
 **Verification status:** code and regression test are committed; the updated local PostgreSQL script has **not yet been rerun** after this change. Do not treat this fix as runtime-verified until that rerun passes.
 
 The invite route also fails closed for anonymous Auth users: Supabase's verified user response must explicitly report `is_anonymous: false`. The test suite now includes an anonymous-user denial case. Reference: https://supabase.com/docs/guides/auth/users.
+
+## High-priority application security gap: Gemini endpoints remain unauthenticated
+
+The current `server.ts` still exposes `POST /api/gemini/extract-knowledge` and `POST /api/gemini/analyze-conflicts` without a Supabase session or workspace-role check. These handlers use the server-side Gemini API key. A publicly reachable endpoint can therefore consume the project's Gemini quota and process caller-supplied content without proving workspace membership.
+
+The new invite route does not solve this. Before the app is treated as a secure multi-user deployment, add a shared Supabase-authenticated middleware, reject anonymous/demo sessions for live AI operations, derive the actor from the verified Auth response, and enforce the relevant workspace contributor role using a trusted workspace ID. Update the frontend to send the session token and workspace ID. Keep the read-only Judge Demo path away from Gemini calls. Add negative tests for missing/expired/anonymous sessions and non-member/viewer roles.
+
+This is an application integration blocker; it is separate from the database RLS review.
