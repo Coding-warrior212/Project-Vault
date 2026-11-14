@@ -617,6 +617,8 @@ export default function App() {
         }}
         workspaces={activeWorkspaceId ? [currentWorkspace] : SAMPLE_WORKSPACES}
         currentWorkspace={currentWorkspace}
+        isDemoWorkspace={!cloud}
+        activeActor={activeActor}
         onSelectWorkspace={(ws) => setCurrentWorkspace(ws)}
         unverifiedCount={unverifiedCount}
         conflictedCount={conflictedCount}
@@ -630,6 +632,7 @@ export default function App() {
         <Header
           currentPage={currentPage}
           currentWorkspace={currentWorkspace}
+          isDemoWorkspace={!cloud}
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
           onPrimaryAction={handlePrimaryAction}
           onNavigate={(page) => setCurrentPage(page)}
@@ -640,6 +643,7 @@ export default function App() {
           {currentPage === 'overview' && (
             <OverviewPage
               currentWorkspace={currentWorkspace}
+              isDemoWorkspace={!cloud}
               workflowStages={WORKFLOW_STAGES}
               sources={sources}
               claims={claims}
