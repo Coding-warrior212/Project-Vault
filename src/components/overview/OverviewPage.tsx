@@ -454,7 +454,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
                   <span className="text-[10px] font-mono font-bold text-[#25245F] dark:text-[#55C7C2] bg-[#FFF4E3] dark:bg-[#1B1A48] px-2 py-0.5 rounded border border-[#E5B25D]/40 dark:border-[#2D2C68]">
                     SOURCE REPOSITORY
                   </span>
-                  <span className="text-xs text-neutral-500 dark:text-[#8E8DAF]">6 ingested</span>
+                  <span className="text-xs text-neutral-500 dark:text-[#8E8DAF]">{isSampleWorkspace ? '6 ingested' : sources.length + ' ingested'}</span>
                 </div>
                 <h4 className="text-xs font-bold text-neutral-900 dark:text-[#FFF4E3]">
                   Connect Additional Project Artifacts
