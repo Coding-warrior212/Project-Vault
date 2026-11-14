@@ -131,10 +131,10 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
   // Handle changes that invalidate prior approval
   const handleNoteChange = (setter: React.Dispatch<React.SetStateAction<string>>, storageKey: string, val: string) => {
     setter(val);
-    if (!cloud) localStorage.setItem(storageKey, val);
+    if (!cloud) localStorage.setItem(getScopedLocalStorageKey(storageKey), val);
     setApprovalError(null);
     setIsApproved(false);
-    if (!cloud) localStorage.setItem('projectvault_handover_approved', 'false');
+    if (!cloud) localStorage.setItem(getScopedLocalStorageKey('projectvault_handover_approved'), 'false');
   };
 
   const handleChecklistToggle = (key: keyof typeof checklist) => {
@@ -144,7 +144,7 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
     });
     setApprovalError(null);
     setIsApproved(false);
-    if (!cloud) localStorage.setItem('projectvault_handover_approved', 'false');
+    if (!cloud) localStorage.setItem(getScopedLocalStorageKey('projectvault_handover_approved'), 'false');
   };
 
   const allChecklistItemsChecked = Object.values(checklist).every(Boolean);
@@ -162,7 +162,7 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
     setApprovalError(null);
     try {
       if (cloud) await saveWorkspaceHandover(cloud.workspace.id, { title: HANDOVER_TEMPLATE.title, executiveNote, finalComment, checklist, isApproved: true, approvedBy: trimmedName });
-      else localStorage.setItem('projectvault_handover_approved', 'true');
+      else localStorage.setItem(getScopedLocalStorageKey('projectvault_handover_approved'), 'true');
       setIsApproved(true);
     } catch (error) {
       setApprovalError(error instanceof Error ? error.message : 'The shared handover could not be saved.');
