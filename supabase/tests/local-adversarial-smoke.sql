@@ -20,6 +20,65 @@ BEGIN
 END;
 $$;
 
+
+-- Verify invite redemption is idempotent after the final allowed use commits.
+-- This simulates a client retry after a successful response was lost in transit.
+INSERT INTO auth.users (id, email, raw_user_meta_data)
+VALUES
+  ('11111111-1111-4111-8111-111111111111', 'invite-owner@example.test', '{"full_name":"Invite Owner"}'::jsonb),
+  ('22222222-2222-4222-8222-222222222222', 'invite-joiner@example.test', '{"full_name":"Invite Joiner"}'::jsonb)
+ON CONFLICT (id) DO NOTHING;
+
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
+SELECT * FROM public.create_workspace_atomic(
+  'Invite Replay Test', 'INVREPLAY', 'Local invite retry regression test',
+  'Engineering Continuity', NULL
+);
+INSERT INTO public.workspace_invites (
+  workspace_id, code_hash, code_prefix, granted_role, max_uses, expires_at
+)
+SELECT id, encode(digest('PV-AB12-CD34', 'sha256'), 'hex'), 'PV-AB12', 'editor', 1, now() + interval '7 days'
+FROM public.workspaces
+WHERE code = 'INVREPLAY';
+SELECT set_config('request.jwt.claim.sub', '', false);
+RESET ROLE;
+
+SET ROLE service_role;
+DO $
+DECLARE
+  v_first record;
+  v_retry record;
+  v_uses integer;
+BEGIN
+  SELECT * INTO v_first
+  FROM public.redeem_workspace_invite_by_hash_atomic(
+    '22222222-2222-4222-8222-222222222222',
+    encode(digest('PV-AB12-CD34', 'sha256'), 'hex')
+  );
+  IF v_first.already_member IS DISTINCT FROM false OR v_first.granted_role <> 'editor' THEN
+    RAISE EXCEPTION 'First invite redemption did not create the expected membership';
+  END IF;
+
+  SELECT * INTO v_retry
+  FROM public.redeem_workspace_invite_by_hash_atomic(
+    '22222222-2222-4222-8222-222222222222',
+    encode(digest('PV-AB12-CD34', 'sha256'), 'hex')
+  );
+  IF v_retry.already_member IS DISTINCT FROM true OR v_retry.granted_role <> 'editor' THEN
+    RAISE EXCEPTION 'Retry after final invite use must return existing membership';
+  END IF;
+
+  SELECT uses_count INTO v_uses
+  FROM public.workspace_invites
+  WHERE code_hash = encode(digest('PV-AB12-CD34', 'sha256'), 'hex');
+  IF v_uses <> 1 THEN
+    RAISE EXCEPTION 'Invite retry must not increment uses_count again; found %', v_uses;
+  END IF;
+END;
+$;
+RESET ROLE;
+
 -- Verify a caller-settable GUC does not unlock demo writes, even for service_role.
 SET ROLE service_role;
 SELECT set_config('projectvault.seed_mode','on',false);
