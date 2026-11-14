@@ -631,6 +631,11 @@ export async function clearAllStoredSources(): Promise<void> {
       transaction.onabort = () => reject(transaction.error || new Error('Clear transaction aborted'));
     });
   } catch (error) {
+    if (isIndexedDBAvailable()) {
+      // Do not report a successful demo reset when the isolated IndexedDB
+      // database could not be cleared.
+      throw error;
+    }
     console.warn('IndexedDB clearAllStoredSources cleared memory only:', error);
   }
 
