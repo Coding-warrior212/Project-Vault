@@ -173,9 +173,9 @@ export async function uploadWorkspaceSourceFile(workspaceId: string, source: Sou
   });
   if(metadataError){await db.storage.from(bucket).remove([path]);await db.from('sources').delete().eq('workspace_id',ws).eq('id',source.id);throw metadataError;}
 }
-export function subscribeWorkspaceChanges(workspaceId: string, onChange: () => void) {
+export function subscribeWorkspaceChanges(workspaceId: string, onChange: () => void, channelSuffix = 'app') {
   const ws=requiredWorkspace(workspaceId);
-  const channel=client().channel('pv-workspace-'+ws)
+  const channel=client().channel('pv-workspace-'+ws+'-'+channelSuffix)
     .on('postgres_changes',{event:'*',schema:'public',table:'sources',filter:'workspace_id=eq.'+ws},onChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'claims',filter:'workspace_id=eq.'+ws},onChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'conflicts',filter:'workspace_id=eq.'+ws},onChange)
