@@ -33,6 +33,7 @@ import {
 
 interface OverviewPageProps {
   currentWorkspace: Workspace;
+  isDemoWorkspace: boolean;
   workflowStages: WorkflowStage[];
   sources: Source[];
   claims: KnowledgeClaim[];
@@ -44,6 +45,7 @@ interface OverviewPageProps {
 
 export const OverviewPage: React.FC<OverviewPageProps> = ({
   currentWorkspace,
+  isDemoWorkspace,
   workflowStages,
   sources,
   claims,
@@ -56,7 +58,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   const unverifiedCount = claims.filter((c) => c.verificationStatus === 'unverified').length;
   const conflictedCount = claims.filter((c) => c.verificationStatus === 'conflicted').length;
   const totalClaims = claims.length;
-  const isSampleWorkspace = currentWorkspace.id.startsWith('ws-');
+  const isSampleWorkspace = isDemoWorkspace;
   const claimCoverage = totalClaims === 0 ? 0 : Math.round((verifiedCount / totalClaims) * 100);
   const visibleWorkflowStages = isSampleWorkspace ? workflowStages : workflowStages.map((stage) => ({
     ...stage,
@@ -65,6 +67,10 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
       : stage.id === 'VERIFY' ? (claims.length > 0 ? 'in_progress' as const : 'awaiting' as const)
       : 'awaiting' as const,
   }));
+
+  const activeWorkflowStage = visibleWorkflowStages.find((stage) => stage.status === 'in_progress')
+    ?? visibleWorkflowStages.find((stage) => stage.status === 'awaiting')
+    ?? visibleWorkflowStages[visibleWorkflowStages.length - 1];
 
   // Real vs Demo sources tracking
   const userUploadedCount = sources.filter((s) => s.isUserUploaded).length;
@@ -170,7 +176,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
               </>
             ) : (
               <span className="text-[10px] font-mono text-neutral-500 dark:text-[#8E8DAF]">
-                {sources.length} demo artifacts
+                {isSampleWorkspace ? `${sources.length} demo artifacts` : `${sources.length} artifacts`}
               </span>
             )}
           </div>
@@ -274,7 +280,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
             </p>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-[#25245F] dark:text-[#FFF4E3] font-bold bg-[#FFF4E3] dark:bg-[#14133B] px-3 py-1.5 rounded-lg border border-[#E5B25D]/50 shadow-xs">
-            <span>Stage 4 of 5 Active · Human Review</span>
+            <span>Stage {activeWorkflowStage?.stepNumber ?? 1} of {visibleWorkflowStages.length} Active · {activeWorkflowStage?.name ?? 'CONNECT'}</span>
           </div>
         </div>
 
