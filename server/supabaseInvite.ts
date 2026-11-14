@@ -53,6 +53,11 @@ export function createInviteRouter(options: InviteRouterOptions = {}) {
       for (const [key, value] of attempts) {
         if (value.resetAt <= now) attempts.delete(key);
       }
+      while (attempts.size > 5000) {
+        const oldestKey = attempts.keys().next().value;
+        if (oldestKey === undefined) break;
+        attempts.delete(oldestKey);
+      }
     }
 
     if (window.count > maxAttempts) {
