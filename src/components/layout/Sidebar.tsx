@@ -321,7 +321,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 case 'overview':
                 case 'settings':
                 default:
-                  return { step: 4, name: 'REVIEW', label: 'Stage 4 / 5' };
+                  if (isDemoWorkspace) return { step: 4, name: 'REVIEW', label: 'Stage 4 / 5' };
+                  return sourcesCount > 0
+                    ? { step: 2, name: 'RECONSTRUCT', label: 'Stage 2 / 5' }
+                    : { step: 1, name: 'CONNECT', label: 'Stage 1 / 5' };
               }
             };
             const currentStage = getStage(currentPage);
