@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { ArrowRight, CheckCircle2, Chrome, KeyRound, LockKeyhole, LogOut, Mail, ShieldCheck, Users } from 'lucide-react';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { WorkspaceSessionProvider } from './WorkspaceSessionContext';
+import { resetLocalDemoData } from '../../services/db';
 
 type WorkspaceAccess = {
   id: string;
@@ -35,6 +36,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [inviteCode, setInviteCode] = React.useState('');
   const [inviteBusy, setInviteBusy] = React.useState(false);
   const [demoMode, setDemoMode] = React.useState(false);
+  const [demoResetBusy, setDemoResetBusy] = React.useState(false);
 
   React.useEffect(() => {
     if (!supabase) {
@@ -230,6 +232,20 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
     }
   };
 
+  const handleResetDemo = async () => {
+    const confirmed = window.confirm('Reset the local ProjectVault demo in this browser? This clears local demo records only. Authenticated team workspaces are not affected.');
+    if (!confirmed) return;
+    setDemoResetBusy(true);
+    try {
+      await resetLocalDemoData();
+      setDemoMode(false);
+    } catch (resetError) {
+      setError(resetError instanceof Error ? resetError.message : 'The local demo could not be reset.');
+    } finally {
+      setDemoResetBusy(false);
+    }
+  };
+
   const handleSignOut = async () => {
     if (!supabase) return;
     setBusy(true);
@@ -256,7 +272,10 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
       <div className="min-h-screen bg-slate-100">
         <div role="status" className="sticky top-0 z-50 flex flex-col gap-2 border-b border-amber-300 bg-amber-50 px-4 py-3 text-center sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="text-xs font-semibold text-amber-950"><span className="font-black tracking-wider">INTERACTIVE JUDGE DEMO</span><span className="mx-2 hidden sm:inline">·</span><span className="block font-normal sm:inline">This is a local demo session. Changes stay in this browser and never sync to team workspaces.</span></div>
-          <button type="button" onClick={() => setDemoMode(false)} className="mx-auto rounded-lg border border-amber-400 bg-white px-3 py-2 text-xs font-bold text-amber-950 hover:bg-amber-100 sm:mx-0">Exit demo</button>
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
+            <button type="button" onClick={() => void handleResetDemo()} disabled={demoResetBusy} className="rounded-lg border border-amber-400 bg-white px-3 py-2 text-xs font-bold text-amber-950 hover:bg-amber-100 disabled:opacity-50">{demoResetBusy ? "Resetting…" : "Reset demo"}</button>
+            <button type="button" onClick={() => setDemoMode(false)} className="rounded-lg border border-amber-400 bg-white px-3 py-2 text-xs font-bold text-amber-950 hover:bg-amber-100">Exit demo</button>
+          </div>
         </div>
         {children}
       </div>

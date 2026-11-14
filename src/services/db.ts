@@ -612,3 +612,18 @@ export async function clearAllStoredSources(): Promise<void> {
   // Clear only the claims backup; source/file binary data is stored separately.
   localStorage.removeItem('projectvault_claims');
 }
+
+/**
+ * Reset the browser-local judge/demo workspace without touching authenticated
+ * Supabase workspaces. The caller must make the destructive action explicit.
+ */
+export async function resetLocalDemoData(): Promise<void> {
+  await clearAllStoredSources();
+  const keysToRemove: string[] = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (key?.startsWith('projectvault_')) keysToRemove.push(key);
+  }
+  keysToRemove.forEach((key) => localStorage.removeItem(key));
+}
+
