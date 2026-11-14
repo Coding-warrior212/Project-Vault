@@ -54,3 +54,29 @@ Before changing the policy, confirm the intended behavior:
 **Hosted database: unchanged; do not apply the migration or merge the draft PR yet.**
 
 The next safe implementation work is to design the Express/Supabase authentication boundary and a precise Storage object lifecycle, then add tests before any hosted migration.
+
+## Review addendum — 2026-11-14
+
+### Supabase-specific Storage semantics
+
+The current Storage policy set has a SELECT policy for workspace members, an INSERT policy for owner/admin/editor, an UPDATE policy with `USING (false)`, and a DELETE policy for owner/admin/editor. This deliberately prevents updates. Supabase Storage upsert/replacement requires the caller to have the relevant SELECT, INSERT, and UPDATE permissions; therefore same-key upsert is not supported by this policy set. This is a confirmed functional restriction, not automatically a security defect.
+
+**Decision still required from product behavior:** whether source objects are immutable and replacements use a new object key, or whether same-key replacement is a supported workflow. Until decided, preserve the deny-by-default UPDATE policy. If replacement is required, design a constrained UPDATE policy and test both old-row and new-row path checks; do not broadly enable updates.
+
+### API and client integration state
+
+The checked `package.json` contains no `@supabase/supabase-js` dependency. The checked `server.ts` has no Supabase client, JWT verification middleware, authenticated invite endpoint, or Supabase-backed persistence route. The checked app's existing persistence remains browser-side IndexedDB/localStorage. Consequently, the SQL migration is not yet connected to the running application.
+
+### Validation scope clarification
+
+The user's successful local run proves that the migration executes in the local PostgreSQL 17 harness and that the harness's included assertions/smoke checks pass. The smoke SQL currently verifies seeded demo data, capability cleanup, and resistance to a forged seed-mode GUC in its local role setup. It is not a complete adversarial matrix for all five workspace roles, invite concurrency, Storage API operations, PostgREST request transaction behavior, or Realtime authorization.
+
+### Safe next implementation sequence
+
+1. Specify the browser/server trust boundary and choose a pinned Supabase JS dependency version only after checking current Supabase docs and project runtime compatibility.
+2. Add server-side bearer-token verification that derives actor identity from a verified Supabase JWT; never accept actor IDs from request JSON.
+3. Add rate-limited invite redemption that hashes invite codes server-side and calls the service-role-only RPC with the server-only secret.
+4. Define immutable-source-file versus same-key replacement behavior, then align Storage policy and upload code.
+5. Add tests for the implemented route and storage lifecycle; run build/type checks and local tests.
+6. Keep Milestone 2 open until actual Supabase-specific gates are verified. No hosted migration, deployment, merge, or secret change is authorized by this review.
+
