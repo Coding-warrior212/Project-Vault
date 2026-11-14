@@ -4,7 +4,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
 const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
 
 function isAllowedSupabaseUrl(value: string | undefined): value is string {
-  if (!value) return false;
+  if (!value || /YOUR_PROJECT_REF|YOUR_SUPABASE/i.test(value)) return false;
   try {
     const url = new URL(value);
     return url.protocol === 'https:' ||
@@ -15,7 +15,7 @@ function isAllowedSupabaseUrl(value: string | undefined): value is string {
 }
 
 export const isSupabaseConfigured = Boolean(
-  isAllowedSupabaseUrl(supabaseUrl) && supabasePublishableKey
+  isAllowedSupabaseUrl(supabaseUrl) && Boolean(supabasePublishableKey && !/YOUR_SUPABASE|MY_SUPABASE/i.test(supabasePublishableKey))
 );
 
 /**
