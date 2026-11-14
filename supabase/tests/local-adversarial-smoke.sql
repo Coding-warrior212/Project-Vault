@@ -38,7 +38,7 @@ SELECT * FROM public.create_workspace_atomic(
 INSERT INTO public.workspace_invites (
   workspace_id, code_hash, code_prefix, granted_role, max_uses, expires_at
 )
-SELECT id, encode(digest('PV-AB12-CD34', 'sha256'), 'hex'), 'PV-AB12', 'editor', 1, now() + interval '7 days'
+SELECT id, '02078f170fe5942c520e314f176e1406759f1cdc03801933a71da64e6b592ccb', 'PV-AB12', 'editor', 1, now() + interval '7 days'
 FROM public.workspaces
 WHERE code = 'INVREPLAY';
 SELECT set_config('request.jwt.claim.sub', '', false);
@@ -54,7 +54,7 @@ BEGIN
   SELECT * INTO v_first
   FROM public.redeem_workspace_invite_by_hash_atomic(
     '22222222-2222-4222-8222-222222222222',
-    encode(digest('PV-AB12-CD34', 'sha256'), 'hex')
+    '02078f170fe5942c520e314f176e1406759f1cdc03801933a71da64e6b592ccb'
   );
   IF v_first.already_member IS DISTINCT FROM false OR v_first.granted_role <> 'editor' THEN
     RAISE EXCEPTION 'First invite redemption did not create the expected membership';
@@ -63,7 +63,7 @@ BEGIN
   SELECT * INTO v_retry
   FROM public.redeem_workspace_invite_by_hash_atomic(
     '22222222-2222-4222-8222-222222222222',
-    encode(digest('PV-AB12-CD34', 'sha256'), 'hex')
+    '02078f170fe5942c520e314f176e1406759f1cdc03801933a71da64e6b592ccb'
   );
   IF v_retry.already_member IS DISTINCT FROM true OR v_retry.granted_role <> 'editor' THEN
     RAISE EXCEPTION 'Retry after final invite use must return existing membership';
@@ -71,7 +71,7 @@ BEGIN
 
   SELECT uses_count INTO v_uses
   FROM public.workspace_invites
-  WHERE code_hash = encode(digest('PV-AB12-CD34', 'sha256'), 'hex');
+  WHERE code_hash = '02078f170fe5942c520e314f176e1406759f1cdc03801933a71da64e6b592ccb';
   IF v_uses IS DISTINCT FROM 1 THEN
     RAISE EXCEPTION 'Invite retry must not increment uses_count again; found %', v_uses;
   END IF;
