@@ -12,7 +12,7 @@ import { Source, KnowledgeClaim, ProjectConflict, MissingInfoFinding, Unresolved
  */
 export async function getAllStoredConflicts(): Promise<ProjectConflict[]> {
   try {
-    const data = localStorage.getItem('projectvault_review_conflicts');
+    const data = localStorage.getItem(getScopedLocalStorageKey('projectvault_review_conflicts');
     if (data) return JSON.parse(data);
   } catch (e) {
     console.warn('localStorage conflicts load failed:', e);
@@ -30,7 +30,7 @@ export async function saveStoredConflicts(conflicts: ProjectConflict[]): Promise
 
 export async function getAllStoredMissingInfo(): Promise<MissingInfoFinding[]> {
   try {
-    const data = localStorage.getItem('projectvault_review_missing');
+    const data = localStorage.getItem(getScopedLocalStorageKey('projectvault_review_missing');
     if (data) return JSON.parse(data);
   } catch (e) {
     console.warn('localStorage missing info load failed:', e);
@@ -48,7 +48,7 @@ export async function saveStoredMissingInfo(items: MissingInfoFinding[]): Promis
 
 export async function getAllStoredQuestions(): Promise<UnresolvedQuestion[]> {
   try {
-    const data = localStorage.getItem('projectvault_review_questions');
+    const data = localStorage.getItem(getScopedLocalStorageKey('projectvault_review_questions');
     if (data) return JSON.parse(data);
   } catch (e) {
     console.warn('localStorage questions load failed:', e);
@@ -64,6 +64,21 @@ export async function saveStoredQuestions(questions: UnresolvedQuestion[]): Prom
   }
 }
 
+type LocalStorageScope = 'default' | 'judge-demo';
+let storageScope: LocalStorageScope = 'default';
+
+/** Switch browser-local persistence between the legacy app and isolated judge-demo stores. */
+export function setLocalStorageScope(scope: LocalStorageScope): void {
+  storageScope = scope;
+}
+
+/** Map legacy localStorage keys into the isolated judge-demo namespace when active. */
+export function getScopedLocalStorageKey(key: string): string {
+  return storageScope === 'judge-demo' && key.startsWith('projectvault_')
+    ? key.replace(/^projectvault_/, 'projectvault_judge_demo_')
+    : key;
+}
+
 const DB_NAME = 'ProjectVault_DB';
 const DB_VERSION = 2; // Incremented for claims store
 const STORE_SOURCES = 'sources';
@@ -71,9 +86,17 @@ const STORE_FILES = 'source_files';
 const STORE_CLAIMS = 'claims';
 
 // In-memory fallback in case IndexedDB is unavailable
-const memorySources = new Map<string, Source>();
-const memoryFiles = new Map<string, { blob: Blob; filename: string; mimeType: string }>();
-const memoryClaims = new Map<string, KnowledgeClaim>();
+const memoryStores: Record<LocalStorageScope, {
+  sources: Map<string, Source>;
+  files: Map<string, { blob: Blob; filename: string; mimeType: string }>;
+  claims: Map<string, KnowledgeClaim>;
+}> = {
+  default: { sources: new Map(), files: new Map(), claims: new Map() },
+  'judge-demo': { sources: new Map(), files: new Map(), claims: new Map() },
+};
+const memorySources = () => memoryStores[storageScope].sources;
+const memoryFiles = () => memoryStores[storageScope].files;
+const memoryClaims = () => memoryStores[storageScope].claims;
 
 /**
  * Keep the localStorage claims backup in sync with deletions. Reads are merged
@@ -81,7 +104,7 @@ const memoryClaims = new Map<string, KnowledgeClaim>();
  * A malformed backup is not silently overwritten: surface the failure to the caller.
  */
 function removeClaimsFromLocalBackup(shouldRemove: (claim: KnowledgeClaim) => boolean): void {
-  const raw = localStorage.getItem('projectvault_claims');
+  const raw = localStorage.getItem(getScopedLocalStorageKey('projectvault_claims');
   if (!raw) return;
 
   const parsed: unknown = JSON.parse(raw);
@@ -93,7 +116,7 @@ function removeClaimsFromLocalBackup(shouldRemove: (claim: KnowledgeClaim) => bo
   localStorage.setItem('projectvault_claims', JSON.stringify(remaining));
 }
 
-let dbPromise: Promise<IDBDatabase> | null = null;
+const dbPromises: Partial<Record<LocalStorageScope, Promise<IDBDatabase>>> = {};
 
 function isIndexedDBAvailable(): boolean {
   try {
@@ -108,13 +131,14 @@ export function getDB(): Promise<IDBDatabase> {
     return Promise.reject(new Error('IndexedDB is not available in this environment. Falling back to memory storage.'));
   }
 
-  if (dbPromise) {
-    return dbPromise;
+  if (dbPromises[storageScope]) {
+    return dbPromises[storageScope]!;
   }
 
-  dbPromise = new Promise((resolve, reject) => {
+  const databaseName = storageScope === 'judge-demo' ? `${DB_NAME}_judge_demo` : DB_NAME;
+  const opening = new Promise<IDBDatabase>((resolve, reject) => {
     try {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      const request = indexedDB.open(databaseName, DB_VERSION);
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
@@ -156,7 +180,8 @@ export function getDB(): Promise<IDBDatabase> {
     }
   });
 
-  return dbPromise;
+  dbPromises[storageScope] = opening;
+  return opening;
 }
 
 /**
@@ -181,7 +206,7 @@ export async function getAllStoredSources(): Promise<Source[]> {
     });
   } catch (error) {
     console.warn('IndexedDB getAllStoredSources fallback to memory:', error);
-    return Array.from(memorySources.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    return Array.from(memorySources().values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   }
 }
 
@@ -200,7 +225,7 @@ export async function getStoredSourceById(id: string): Promise<Source | null> {
       request.onerror = () => reject(request.error);
     });
   } catch {
-    return memorySources.get(id) || null;
+    return memorySources().get(id) || null;
   }
 }
 
@@ -208,7 +233,7 @@ export async function getStoredSourceById(id: string): Promise<Source | null> {
  * Save or update a source record in IndexedDB
  */
 export async function saveStoredSource(source: Source): Promise<void> {
-  memorySources.set(source.id, source);
+  memorySources().set(source.id, source);
 
   try {
     const db = await getDB();
@@ -238,7 +263,7 @@ export async function saveStoredFile(id: string, file: File): Promise<void> {
     updatedAt: Date.now(),
   };
 
-  memoryFiles.set(id, { blob: file, filename: file.name, mimeType: fileData.mimeType });
+  memoryFiles().set(id, { blob: file, filename: file.name, mimeType: fileData.mimeType });
 
   try {
     const db = await getDB();
@@ -274,14 +299,14 @@ export async function getStoredFile(id: string): Promise<{ blob: Blob; filename:
             mimeType: request.result.mimeType,
           });
         } else {
-          resolve(memoryFiles.get(id) || null);
+          resolve(memoryFiles().get(id) || null);
         }
       };
 
-      request.onerror = () => resolve(memoryFiles.get(id) || null);
+      request.onerror = () => resolve(memoryFiles().get(id) || null);
     });
   } catch {
-    return memoryFiles.get(id) || null;
+    return memoryFiles().get(id) || null;
   }
 }
 
@@ -289,13 +314,13 @@ export async function getStoredFile(id: string): Promise<{ blob: Blob; filename:
  * Delete a source, its associated stored file, and all associated claims
  */
 export async function deleteStoredSource(id: string): Promise<void> {
-  memorySources.delete(id);
-  memoryFiles.delete(id);
+  memorySources().delete(id);
+  memoryFiles().delete(id);
 
   // Remove in-memory claims for this source
-  for (const [claimId, claim] of memoryClaims.entries()) {
+  for (const [claimId, claim] of memoryClaims().entries()) {
     if (claim.sourceId === id) {
-      memoryClaims.delete(claimId);
+      memoryClaims().delete(claimId);
     }
   }
 
@@ -351,7 +376,7 @@ export async function findDuplicateSourceByHash(hash: string): Promise<Source | 
       request.onerror = () => reject(request.error);
     });
   } catch {
-    for (const source of memorySources.values()) {
+    for (const source of memorySources().values()) {
       if (source.contentHash === hash) return source;
     }
     return null;
@@ -365,7 +390,7 @@ export async function saveStoredClaims(claims: KnowledgeClaim[]): Promise<void> 
   if (!claims || claims.length === 0) return;
 
   for (const claim of claims) {
-    memoryClaims.set(claim.id, claim);
+    memoryClaims().set(claim.id, claim);
     console.log(`[DIAGNOSTIC] saveStoredClaims called for claim ${claim.id}:`, {
       id: claim.id,
       verificationStatus: claim.verificationStatus,
@@ -378,7 +403,7 @@ export async function saveStoredClaims(claims: KnowledgeClaim[]): Promise<void> 
   let localStorageSuccess = false;
   try {
     const existingMap = new Map<string, KnowledgeClaim>();
-    const localData = localStorage.getItem('projectvault_claims');
+    const localData = localStorage.getItem(getScopedLocalStorageKey('projectvault_claims');
     if (localData) {
       const parsed: KnowledgeClaim[] = JSON.parse(localData);
       parsed.forEach((c) => existingMap.set(c.id, c));
@@ -474,7 +499,7 @@ export async function getAllStoredClaims(): Promise<KnowledgeClaim[]> {
 
   let localClaims: KnowledgeClaim[] = [];
   try {
-    const localData = localStorage.getItem('projectvault_claims');
+    const localData = localStorage.getItem(getScopedLocalStorageKey('projectvault_claims');
     if (localData) {
       localClaims = JSON.parse(localData);
     }
@@ -485,7 +510,7 @@ export async function getAllStoredClaims(): Promise<KnowledgeClaim[]> {
 
   // Merge dbClaims and localClaims by id, falling back to memoryClaims
   const map = new Map<string, KnowledgeClaim>();
-  memoryClaims.forEach((c) => map.set(c.id, c));
+  memoryClaims().forEach((c) => map.set(c.id, c));
   localClaims.forEach((c) => map.set(c.id, c));
   dbClaims.forEach((c) => map.set(c.id, c));
 
@@ -513,7 +538,7 @@ export async function getStoredClaimsBySourceId(sourceId: string): Promise<Knowl
       request.onerror = () => reject(request.error);
     });
   } catch {
-    return Array.from(memoryClaims.values()).filter((c) => c.sourceId === sourceId);
+    return Array.from(memoryClaims().values()).filter((c) => c.sourceId === sourceId);
   }
 }
 
@@ -521,9 +546,9 @@ export async function getStoredClaimsBySourceId(sourceId: string): Promise<Knowl
  * Delete claims associated with a given source ID (used during reprocessing)
  */
 export async function deleteStoredClaimsBySourceId(sourceId: string): Promise<void> {
-  for (const [id, claim] of memoryClaims.entries()) {
+  for (const [id, claim] of memoryClaims().entries()) {
     if (claim.sourceId === sourceId) {
-      memoryClaims.delete(id);
+      memoryClaims().delete(id);
     }
   }
 
@@ -558,7 +583,7 @@ export async function deleteStoredClaimsBySourceId(sourceId: string): Promise<vo
  * Delete a specific claim by ID
  */
 export async function deleteStoredClaim(claimId: string): Promise<void> {
-  memoryClaims.delete(claimId);
+  memoryClaims().delete(claimId);
 
   try {
     const db = await getDB();
@@ -589,9 +614,9 @@ export async function updateStoredClaim(claim: KnowledgeClaim): Promise<void> {
  * Clear all user-uploaded stored sources and claims
  */
 export async function clearAllStoredSources(): Promise<void> {
-  memorySources.clear();
-  memoryFiles.clear();
-  memoryClaims.clear();
+  memorySources().clear();
+  memoryFiles().clear();
+  memoryClaims().clear();
 
   try {
     const db = await getDB();
@@ -610,7 +635,7 @@ export async function clearAllStoredSources(): Promise<void> {
   }
 
   // Clear only the claims backup; source/file binary data is stored separately.
-  localStorage.removeItem('projectvault_claims');
+  localStorage.removeItem(getScopedLocalStorageKey('projectvault_claims');
 }
 
 /**
@@ -618,12 +643,17 @@ export async function clearAllStoredSources(): Promise<void> {
  * Supabase workspaces. The caller must make the destructive action explicit.
  */
 export async function resetLocalDemoData(): Promise<void> {
-  await clearAllStoredSources();
-  const keysToRemove: string[] = [];
-  for (let index = 0; index < localStorage.length; index += 1) {
-    const key = localStorage.key(index);
-    if (key?.startsWith('projectvault_')) keysToRemove.push(key);
+  setLocalStorageScope('judge-demo');
+  try {
+    await clearAllStoredSources();
+    const keysToRemove: string[] = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith('projectvault_judge_demo_')) keysToRemove.push(key);
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+  } finally {
+    setLocalStorageScope('default');
   }
-  keysToRemove.forEach((key) => localStorage.removeItem(key));
 }
 
