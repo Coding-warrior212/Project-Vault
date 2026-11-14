@@ -49,8 +49,12 @@ import {
   INITIAL_QUESTIONS,
 } from './data/sampleData';
 import { ProjectConflict, MissingInfoFinding, UnresolvedQuestion } from './types';
+import { useWorkspaceSession } from './components/auth/WorkspaceSessionContext';
+import { appendWorkspaceActivity, deleteWorkspaceSource, loadWorkspaceData, saveWorkspaceClaims, saveWorkspaceConflicts, saveWorkspaceMissingInfo, saveWorkspaceQuestions, saveWorkspaceSource, subscribeWorkspaceChanges } from './services/workspaceCloud';
 
 export default function App() {
+  const cloud = useWorkspaceSession();
+  const activeWorkspaceId = cloud?.workspace.id;
   const [currentPage, setCurrentPage] = React.useState<AppPage>('overview');
   const [currentWorkspace, setCurrentWorkspace] = React.useState<Workspace>(
     SAMPLE_WORKSPACES[0]
@@ -74,6 +78,32 @@ export default function App() {
 
   // Load user-uploaded sources, persistent reconstructed claims, and review engine findings from storage on startup
   React.useEffect(() => {
+    if (cloud && activeWorkspaceId) {
+      let active = true;
+      let unsubscribe: (() => void) | undefined;
+      setIsDbLoading(true);
+      // Clear demo state before the private workspace request resolves. This prevents
+      // sample/demo records from flashing in an authenticated team workspace.
+      setSources([]); setClaims([]); setConflicts([]); setMissingInfo([]); setQuestions([]); setActivity([]);
+      setCurrentWorkspace({
+        id: cloud.workspace.id, name: cloud.workspace.name, code: cloud.workspace.code,
+        description: cloud.workspace.description, role: cloud.workspace.role,
+        projectType: cloud.workspace.projectType, createdAt: new Date().toISOString(),
+      });
+      const refresh = async () => {
+        const data = await loadWorkspaceData(activeWorkspaceId);
+        if (!active) return;
+        setSources(data.sources); setClaims(data.claims); setConflicts(data.conflicts);
+        setMissingInfo(data.missingInfo); setQuestions(data.questions); setActivity(data.activity);
+      };
+      void refresh().then(() => {
+        if (active) unsubscribe = subscribeWorkspaceChanges(activeWorkspaceId, () => { void refresh().catch((e) => console.error('Workspace refresh failed', e)); });
+      }).catch((e) => {
+        console.error('Workspace cloud load failed:', e);
+        if (active) alert('Could not load this workspace. No local demo data was shown. Check your connection and workspace permissions.');
+      }).finally(() => { if (active) setIsDbLoading(false); });
+      return () => { active = false; unsubscribe?.(); };
+    }
     let isMounted = true;
 
     async function loadStoredData() {
@@ -141,7 +171,7 @@ export default function App() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [activeWorkspaceId]);
 
   // Review Engine handlers
   const [isAnalyzingConflicts, setIsAnalyzingConflicts] = React.useState(false);
