@@ -1,4 +1,4 @@
-export type AppPage = 'overview' | 'sources' | 'ledger' | 'review' | 'handover' | 'settings';
+export type AppPage = 'overview' | 'sources' | 'ledger' | 'review' | 'handover' | 'graph' | 'settings';
 
 export type WorkflowStageId = 'CONNECT' | 'RECONSTRUCT' | 'VERIFY' | 'REVIEW' | 'HANDOVER';
 
