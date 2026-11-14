@@ -30,6 +30,8 @@ import {
 } from 'lucide-react';
 import { SourceType3DGlyph } from '../common/Soft3DVisuals';
 import { getStoredFile } from '../../services/db';
+import { useWorkspaceSession } from '../auth/WorkspaceSessionContext';
+import { downloadWorkspaceSourceFile } from '../../services/workspaceCloud';
 
 interface SourceDetailModalProps {
   source: Source | null;
@@ -50,12 +52,14 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
   onDeleteSource,
   onReconstructSource,
 }) => {
+  const cloud = useWorkspaceSession();
   const [activeTab, setActiveTab] = React.useState<'extracted' | 'pages' | 'excerpt' | 'claims'>('extracted');
   const [selectedPageNum, setSelectedPageNum] = React.useState<number>(1);
   const [copiedText, setCopiedText] = React.useState(false);
   const [copiedHash, setCopiedHash] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [searchInDoc, setSearchInDoc] = React.useState('');
+  const [downloadError, setDownloadError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (source) {
@@ -69,6 +73,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
   if (!source) return null;
 
   const sourceClaims = claims.filter((c) => c.sourceId === source.id);
+  React.useEffect(() => { setDownloadError(null); }, [source.id]);
   const isPdfWithPages = source.type === 'pdf' && source.pages && source.pages.length > 0;
   const isUserUploaded = Boolean(source.isUserUploaded);
   const displayText = source.extractedText || source.rawExcerpt || '';
@@ -99,6 +104,16 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
 
   const handleDownloadOriginal = async () => {
     try {
+      if (cloud) {
+        const file = await downloadWorkspaceSourceFile(cloud.workspace.id, source.id);
+        const anchor = document.createElement('a');
+        anchor.href = file.url;
+        anchor.download = file.filename;
+        anchor.rel = 'noopener';
+        anchor.click();
+        setDownloadError(null);
+        return;
+      }
       const stored = await getStoredFile(source.id);
       if (stored && stored.blob) {
         const url = URL.createObjectURL(stored.blob);
@@ -112,8 +127,9 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
         handleDownloadExtractedText();
       }
     } catch (err) {
-      console.warn('Original file download failed, downloading text instead:', err);
-      handleDownloadExtractedText();
+      console.warn('Original file download failed:', err);
+      if (cloud) setDownloadError(err instanceof Error ? err.message : 'Secure download failed.');
+      else handleDownloadExtractedText();
     }
   };
 
