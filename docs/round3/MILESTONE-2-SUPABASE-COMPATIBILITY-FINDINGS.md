@@ -84,3 +84,11 @@ The user's successful local run proves that the migration executes in the local 
 5. Verify the invite route, RLS, RPC grants, and Storage against a disposable Supabase environment only after explicit execution/cost approval.
 6. Keep Milestone 2 open until all required Supabase-specific gates are verified. No hosted migration, deployment, merge, or secret change is authorized by this review.
 
+
+## Invite replay correctness fix — 2026-11-14
+
+A further code review found an idempotency edge case in the original SQL RPC: it checked `uses_count >= max_uses` before checking whether the authenticated user was already a workspace member. If the first redemption committed at the final allowed use but the HTTP response was lost, a retry by that same user returned `INVITE_EXHAUSTED` instead of the existing membership result.
+
+The development migration now checks existing membership before enforcing the use limit (while still rejecting unknown, revoked, expired, and demo-workspace invites). The local adversarial smoke SQL now creates a one-use invite, redeems it once, retries as the same user, and asserts that the second call is idempotent and the counter remains exactly one.
+
+**Verification status:** code and regression test are committed; the updated local PostgreSQL script has **not yet been rerun** after this change. Do not treat this fix as runtime-verified until that rerun passes.
