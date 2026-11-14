@@ -144,3 +144,10 @@ Latest static scan of the committed migration:
 - One top-level BEGIN/COMMIT pair.
 
 **Execution status:** the local runner has been committed but has not been executed in this environment: Docker, PostgreSQL client/server binaries and outbound package/image network access are unavailable here. Therefore the migration is still unexecuted, and Milestone 2 remains open. The user can run the free local script from the repository root when Docker Desktop is available. A passing local run must not be represented as proof of Supabase-hosted behavior.
+
+
+### Final delimiter correction
+
+A second pass over every function terminator found two inline `END; $;` delimiters missed by the first repair. Both are now corrected to `END; $$;` in commit `0e324f9`. The final lexical scan reports 29 balanced dollar-quoted blocks, no unclosed strings/comments/blocks, balanced parentheses, and all 25 SECURITY DEFINER functions with fixed search_path.
+
+Updated static counts: 14 public tables + 1 private capability table; RLS on all 14 public tables and the private capability table; 60 policies; 41 triggers; 27 functions; 25 SECURITY DEFINER functions. These are static source counts, not evidence of successful database execution.
