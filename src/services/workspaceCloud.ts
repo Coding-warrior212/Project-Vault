@@ -234,3 +234,14 @@ export async function findWorkspaceDuplicateSourceByHash(workspaceId: string, co
   if(error)throw error;
   return data ? {id:data.id,title:data.title} : null;
 }
+
+export async function updateWorkspaceClaim(workspaceId: string, claim: KnowledgeClaim) {
+  const ws=requiredWorkspace(workspaceId);
+  const {error}=await client().from('claims').update({
+    verification_status:claim.verificationStatus,human_review_notes:claim.humanReviewNotes ?? null,
+    last_reviewed_by:claim.lastReviewedBy ?? null,last_reviewed_at:claim.lastReviewedAt ?? null,
+    is_flagged:claim.isFlagged ?? false,flagged_at:claim.flaggedAt ?? null,
+    flagged_by:claim.flaggedBy ?? null,flag_reason:claim.flagReason ?? null,
+  }).eq('workspace_id',ws).eq('id',claim.id);
+  if(error)throw error;
+}
