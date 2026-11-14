@@ -248,13 +248,15 @@ export default function App() {
   const handleUpdateConflictStatus = async (conflictId: string, status: ProjectConflict['status'], note?: string) => {
     const updated = conflicts.map(c => c.id === conflictId ? { ...c, status, resolvedNote: note !== undefined ? note : c.resolvedNote } : c);
     setConflicts(updated);
-    await saveStoredConflicts(updated);
+    if (activeWorkspaceId) await saveWorkspaceConflicts(activeWorkspaceId, updated);
+    else await saveStoredConflicts(updated);
   };
 
   const handleUpdateMissingInfoStatus = async (itemId: string, status: MissingInfoFinding['status']) => {
     const updated = missingInfo.map(m => m.id === itemId ? { ...m, status } : m);
     setMissingInfo(updated);
-    await saveStoredMissingInfo(updated);
+    if (activeWorkspaceId) await saveWorkspaceMissingInfo(activeWorkspaceId, updated);
+    else await saveStoredMissingInfo(updated);
   };
 
   const handleUpdateQuestion = async (qId: string, status: UnresolvedQuestion['status'], answer?: string) => {
@@ -271,7 +273,8 @@ export default function App() {
       return q;
     });
     setQuestions(updated);
-    await saveStoredQuestions(updated);
+    if (activeWorkspaceId) await saveWorkspaceQuestions(activeWorkspaceId, updated);
+    else await saveStoredQuestions(updated);
   };
 
   // Status counters
@@ -314,7 +317,8 @@ export default function App() {
 
     // 3. Persist to storage (IndexedDB + localStorage) with diagnostics
     try {
-      await saveStoredClaims([updatedClaim]);
+      if (activeWorkspaceId) await saveWorkspaceClaims(activeWorkspaceId, [updatedClaim]);
+      else await saveStoredClaims([updatedClaim]);
       console.log(`[DIAGNOSTIC] Successfully saved updated claim ${claimId} co-persisted.`);
     } catch (err) {
       console.error(`[DIAGNOSTIC] FAILED to persist updated claim ${claimId}:`, err);
@@ -365,9 +369,10 @@ export default function App() {
 
     // 3. Persist to IndexedDB so it survives page refresh
     try {
-      await saveStoredClaims([updatedClaim]);
+      if (activeWorkspaceId) await saveWorkspaceClaims(activeWorkspaceId, [updatedClaim]);
+      else await saveStoredClaims([updatedClaim]);
     } catch (err) {
-      console.warn('Failed to persist flagged claim to IndexedDB:', err);
+      console.warn('Failed to persist flagged claim:', err);
     }
 
     // 4. Record Activity event
@@ -400,6 +405,7 @@ export default function App() {
       sourceId: newSource.id,
     };
     setActivity((prev) => [newAct, ...prev]);
+    if (activeWorkspaceId) void appendWorkspaceActivity(activeWorkspaceId, newAct).catch((e) => alert('Source activity could not be synchronized: ' + e.message));
   };
 
   // Handle opening Reconstruct modal for a given source
@@ -409,7 +415,7 @@ export default function App() {
   };
 
   // Handle knowledge claims reconstructed by Gemini
-  const handleClaimsExtracted = (
+  const handleClaimsExtracted = async (
     sourceId: string,
     newClaims: KnowledgeClaim[],
     updatedSource: Source
@@ -436,15 +442,25 @@ export default function App() {
       sourceId,
     };
     setActivity((prev) => [newAct, ...prev]);
+    if (activeWorkspaceId) {
+      try {
+        await saveWorkspaceSource(activeWorkspaceId, updatedSource);
+        await saveWorkspaceClaims(activeWorkspaceId, newClaims);
+        await appendWorkspaceActivity(activeWorkspaceId, newAct);
+      } catch (e) {
+        alert('Reconstructed knowledge could not be saved to the workspace: ' + (e instanceof Error ? e.message : 'unknown error'));
+      }
+    }
   };
 
   // Handle deleting a source (cascades deletion of claims)
   const handleDeleteSource = async (sourceId: string) => {
     const target = sources.find((s) => s.id === sourceId);
 
-    // Delete in IndexedDB
+    // Delete only within the active persistence boundary.
     try {
-      await deleteStoredSource(sourceId);
+      if (activeWorkspaceId) await deleteWorkspaceSource(activeWorkspaceId, sourceId);
+      else await deleteStoredSource(sourceId);
     } catch (err) {
       console.warn('Error deleting stored source:', err);
     }
@@ -476,6 +492,10 @@ export default function App() {
 
   // Reset sample data
   const handleResetSampleData = async () => {
+    if (activeWorkspaceId) {
+      alert('Sample data reset is disabled in authenticated workspaces. Your shared team data has not been changed.');
+      return;
+    }
     try {
       const stored = await getAllStoredSources();
       setSources([...stored, ...INITIAL_SOURCES]);
