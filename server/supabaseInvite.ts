@@ -98,9 +98,13 @@ export function createInviteRouter(options: InviteRouterOptions = {}) {
         return res.status(401).json({ error: 'Your sign-in session is invalid or expired. Please sign in again.' });
       }
 
-      const authUser = await authResponse.json() as { id?: unknown };
-      if (typeof authUser.id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(authUser.id)) {
-        return res.status(401).json({ error: 'Supabase did not return a valid authenticated user.' });
+      const authUser = await authResponse.json() as { id?: unknown; is_anonymous?: unknown };
+      if (
+        typeof authUser.id !== 'string' ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(authUser.id) ||
+        authUser.is_anonymous !== false
+      ) {
+        return res.status(403).json({ error: 'Only a signed-in team member can redeem a workspace invite.' });
       }
 
       // The secret key is sent only as an apikey header (never as a bearer JWT).
