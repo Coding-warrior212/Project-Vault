@@ -27,6 +27,7 @@ import { SourceDetailModal } from './components/sources/SourceDetailModal';
 import { ReconstructModal } from './components/sources/ReconstructModal';
 import { KnowledgeLedgerPage } from './components/ledger/KnowledgeLedgerPage';
 import { ReviewPage } from './components/review/ReviewPage';
+import { KnowledgeGraphPage } from './components/graph/KnowledgeGraphPage';
 import { HandoverPage } from './components/handover/HandoverPage';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { ClaimModal } from './components/common/ClaimModal';
@@ -615,6 +616,15 @@ export default function App() {
               onNavigateToReview={() => setCurrentPage('review')}
               onNavigateToSources={() => setCurrentPage('sources')}
               onToggleFlagClaim={handleToggleFlagClaim}
+            />
+          )}
+
+          {currentPage === 'graph' && (
+            <KnowledgeGraphPage
+              sources={sources}
+              claims={claims}
+              conflicts={conflicts}
+              onInspectClaim={(claim) => setInspectingClaim(claim)}
             />
           )}
 
