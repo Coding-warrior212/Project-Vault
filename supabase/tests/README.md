@@ -73,3 +73,7 @@ npm run build
 ```
 
 These checks do not require Supabase credentials. The invite endpoint itself requires `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and the server-only `SUPABASE_SECRET_KEY`; do not put the secret in any `VITE_` variable or browser bundle. The endpoint validates user sessions through Supabase Auth, then calls the service-role-only invite RPC with the authenticated user ID returned by Auth.
+
+## Invite redemption retry regression
+
+The local adversarial smoke script also tests that a one-use invite can be retried idempotently by the same user after a successful redemption, without incrementing `uses_count` a second time. Re-run the full local validation script after changes to the migration or smoke SQL.
