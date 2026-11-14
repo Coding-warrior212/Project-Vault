@@ -64,7 +64,7 @@ interface SourcesPageProps {
   onOpenSourceDetail: (source: Source) => void;
   onOpenConnectModal: () => void;
   onSourceAdded?: (newSource: Source) => void;
-  onSourceDeleted?: (sourceId: string) => void;
+  onSourceDeleted?: (sourceId: string) => void | Promise<void>;
   onReconstructSource?: (source: Source) => void;
   onNavigateToLedger?: (sourceId?: string) => void;
   isLoading?: boolean;
@@ -325,13 +325,18 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
 
   const handleDeleteConfirmed = async (sourceId: string) => {
     try {
-      await deleteStoredSource(sourceId);
-      if (onSourceDeleted) {
-        onSourceDeleted(sourceId);
-      }
+      // Authenticated workspaces must delete through the workspace cloud handler.
+      // Local IndexedDB is used only when no parent persistence handler is supplied.
+      if (onSourceDeleted) await onSourceDeleted(sourceId);
+      else await deleteStoredSource(sourceId);
       setDeletingSourceId(null);
     } catch (err) {
-      console.error('Failed to delete source from IndexedDB:', err);
+      console.error('Failed to delete source:', err);
+      setUploadFeedback({
+        type: 'error',
+        title: 'Source deletion failed',
+        messages: [err instanceof Error ? err.message : 'The source could not be deleted. Please retry.'],
+      });
     }
   };
 
