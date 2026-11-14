@@ -56,16 +56,18 @@ export default function App() {
   const cloud = useWorkspaceSession();
   const activeWorkspaceId = cloud?.workspace.id;
   const [currentPage, setCurrentPage] = React.useState<AppPage>('overview');
-  const [currentWorkspace, setCurrentWorkspace] = React.useState<Workspace>(
-    SAMPLE_WORKSPACES[0]
-  );
-  const [sources, setSources] = React.useState<Source[]>(INITIAL_SOURCES);
-  const [claims, setClaims] = React.useState<KnowledgeClaim[]>(INITIAL_CLAIMS);
-  const [conflicts, setConflicts] = React.useState<ProjectConflict[]>(INITIAL_CONFLICTS);
-  const [missingInfo, setMissingInfo] = React.useState<MissingInfoFinding[]>(INITIAL_MISSING_INFO);
-  const [questions, setQuestions] = React.useState<UnresolvedQuestion[]>(INITIAL_QUESTIONS);
-  const [activity, setActivity] = React.useState<ActivityEvent[]>(SAMPLE_ACTIVITY);
-  const [isDbLoading, setIsDbLoading] = React.useState<boolean>(true);
+  const [currentWorkspace, setCurrentWorkspace] = React.useState<Workspace>(() => cloud ? ({
+    id: cloud.workspace.id, name: cloud.workspace.name, code: cloud.workspace.code,
+    description: cloud.workspace.description, role: cloud.workspace.role,
+    projectType: cloud.workspace.projectType, createdAt: new Date().toISOString(),
+  }) : SAMPLE_WORKSPACES[0]);
+  const [sources, setSources] = React.useState<Source[]>(cloud ? [] : INITIAL_SOURCES);
+  const [claims, setClaims] = React.useState<KnowledgeClaim[]>(cloud ? [] : INITIAL_CLAIMS);
+  const [conflicts, setConflicts] = React.useState<ProjectConflict[]>(cloud ? [] : INITIAL_CONFLICTS);
+  const [missingInfo, setMissingInfo] = React.useState<MissingInfoFinding[]>(cloud ? [] : INITIAL_MISSING_INFO);
+  const [questions, setQuestions] = React.useState<UnresolvedQuestion[]>(cloud ? [] : INITIAL_QUESTIONS);
+  const [activity, setActivity] = React.useState<ActivityEvent[]>(cloud ? [] : SAMPLE_ACTIVITY);
+  const [isDbLoading, setIsDbLoading] = React.useState<boolean>(Boolean(cloud));
 
   // Modals & Drawers state
   const [inspectingClaim, setInspectingClaim] = React.useState<KnowledgeClaim | null>(null);
@@ -344,6 +346,7 @@ export default function App() {
     };
 
     setActivity((prev) => [newActivity, ...prev]);
+    if (activeWorkspaceId) void appendWorkspaceActivity(activeWorkspaceId, newActivity).catch((e) => alert('Activity could not be synchronized: ' + e.message));
   };
 
   // Handle toggling persistent flag state on a claim
@@ -387,6 +390,7 @@ export default function App() {
       sourceId: updatedClaim.sourceId,
     };
     setActivity((prev) => [newAct, ...prev]);
+    if (activeWorkspaceId) void appendWorkspaceActivity(activeWorkspaceId, newAct).catch((e) => alert('Activity could not be synchronized: ' + e.message));
   };
 
   // Handle adding a newly ingested source (from upload or connector)
@@ -553,7 +557,7 @@ export default function App() {
           setCurrentPage(page);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        workspaces={SAMPLE_WORKSPACES}
+        workspaces={activeWorkspaceId ? [currentWorkspace] : SAMPLE_WORKSPACES}
         currentWorkspace={currentWorkspace}
         onSelectWorkspace={(ws) => setCurrentWorkspace(ws)}
         unverifiedCount={unverifiedCount}
