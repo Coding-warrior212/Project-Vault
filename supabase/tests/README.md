@@ -61,3 +61,15 @@ The script starts a temporary PostgreSQL 17 container on the local machine, crea
 The test uses no cloud database and does not change the hosted Supabase project. The first Docker run may download the PostgreSQL image.
 
 **Limitations:** local stubs cannot prove managed Supabase role ownership, PostgREST transaction behavior, OAuth/Google Auth, Realtime delivery, actual Storage API semantics, Edge Function behavior or production concurrency characteristics. Passing the local script is necessary but not sufficient for a production migration.
+
+## Server invite-boundary tests
+
+After installing the repository dependencies, run:
+
+```bash
+npm run test:server
+npm run lint
+npm run build
+```
+
+These checks do not require Supabase credentials. The invite endpoint itself requires `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and the server-only `SUPABASE_SECRET_KEY`; do not put the secret in any `VITE_` variable or browser bundle. The endpoint validates user sessions through Supabase Auth, then calls the service-role-only invite RPC with the authenticated user ID returned by Auth.
