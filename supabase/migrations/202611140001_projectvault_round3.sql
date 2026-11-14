@@ -1,7 +1,7 @@
 -- ProjectVault Round 3 schema migration.
 -- Derived from the reviewed architecture specification.
 -- Hardening: transaction-bound private capabilities replace caller-settable GUC bypasses.
--- STATUS: DRAFT — NOT YET EXECUTED OR VALIDATED ON A DISPOSABLE DATABASE.
+-- STATUS: DRAFT — local PostgreSQL 17 harness passed before the latest invite-retry regression; managed Supabase remains unverified.
 -- Do not apply to production until disposable Supabase tests pass.
 BEGIN;
 
@@ -9,7 +9,7 @@ BEGIN;
 -- ProjectVault Round 3 — Complete Supabase PostgreSQL Schema, RBAC, Triggers,
 -- Storage, Realtime & Verified Judge Demo Seed (ws-apex)
 -- Target Engine: PostgreSQL 15+ (Supabase)
--- Status: Static design specification (NOT YET EXECUTED)
+-- Status: Draft migration (NOT YET EXECUTED ON MANAGED SUPABASE)
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -2292,7 +2292,7 @@ $$;
 
 -- ----------------------------------------------------------------------------
 -- SECTION 9: VERIFIED JUDGE DEMO SEED DATA (ws-apex)
--- Scoped inside a transaction with seed_mode = 'on'; automatically locked after COMMIT
+-- Scoped to a transaction-bound private seed capability; automatically removed before COMMIT
 -- ----------------------------------------------------------------------------
 
 INSERT INTO private.operation_capabilities(transaction_id,operation,actor_id) VALUES(pg_catalog.pg_current_xact_id(),'seed',NULL) ON CONFLICT DO NOTHING;
