@@ -401,7 +401,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
         <p className="mt-2 text-[11px] text-slate-500">The server validates your Supabase session and redeems the invite atomically. User IDs are never accepted from the browser.</p>
       </form>
 
-      <button type="button" onClick={() => setDemoMode(true)} className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-teal-300 bg-teal-50 px-4 py-3 text-sm font-bold text-teal-950 transition hover:bg-teal-100">Explore interactive demo <ArrowRight className="h-4 w-4" /></button>
+      <button type="button" onClick={() => { setLocalStorageScope('judge-demo'); setDemoMode(true); }} className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-teal-300 bg-teal-50 px-4 py-3 text-sm font-bold text-teal-950 transition hover:bg-teal-100">Explore interactive demo <ArrowRight className="h-4 w-4" /></button>
       <div className="mt-6 rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-xs leading-5 text-indigo-950">
         <strong>Select a workspace to continue.</strong> Project records are loaded only after you open an authorized workspace. Local demo records are never copied into team workspaces automatically.
       </div>
