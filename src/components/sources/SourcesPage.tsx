@@ -46,6 +46,8 @@ import {
   findDuplicateSourceByHash,
   deleteStoredSource,
 } from '../../services/db';
+import { useWorkspaceSession } from '../auth/WorkspaceSessionContext';
+import { findWorkspaceDuplicateSourceByHash, saveWorkspaceSource, uploadWorkspaceSourceFile } from '../../services/workspaceCloud';
 
 interface UploadQueueItem {
   id: string;
@@ -78,6 +80,7 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
   onNavigateToLedger,
   isLoading = false,
 }) => {
+  const cloud = useWorkspaceSession();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedType, setSelectedType] = React.useState<string>('all');
   const [selectedOrigin, setSelectedOrigin] = React.useState<'all' | 'user' | 'demo'>('all');
@@ -185,7 +188,9 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
 
         // Check if hash already exists in memory or IndexedDB
         const duplicateInMemory = sources.find((s) => s.contentHash === hash);
-        const duplicateInDB = duplicateInMemory ? null : await findDuplicateSourceByHash(hash);
+        const duplicateInDB = duplicateInMemory ? null : cloud
+          ? await findWorkspaceDuplicateSourceByHash(cloud.workspace.id, hash)
+          : await findDuplicateSourceByHash(hash);
         const duplicate = duplicateInMemory || duplicateInDB;
 
         if (duplicate) {
@@ -207,7 +212,7 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
         });
 
         // Step 4: Construct Real Source Record
-        updateQueue({ progress: 92, status: 'saving', message: 'Saving to local IndexedDB...' });
+        updateQueue({ progress: 92, status: 'saving', message: cloud ? 'Saving to private workspace storage...' : 'Saving to local IndexedDB...' });
 
         const sourceId = `src-usr-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(2, 6)}`;
         const cleanName = sanitizeFilename(file.name);
@@ -237,12 +242,17 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
           contentHash: hash,
           isUserUploaded: true,
           mimeType: file.type || (validation.type === 'pdf' ? 'application/pdf' : 'text/plain'),
-          tags: [validation.type.toUpperCase(), 'User Upload', 'IndexedDB'],
+          tags: [validation.type.toUpperCase(), 'User Upload', cloud ? 'Workspace Storage' : 'IndexedDB'],
         };
 
-        // Step 5: Persist to IndexedDB
-        await saveStoredSource(newSource);
-        await saveStoredFile(sourceId, file);
+        // Step 5: Persist within the active data boundary.
+        if (cloud) {
+          await saveWorkspaceSource(cloud.workspace.id, newSource);
+          await uploadWorkspaceSourceFile(cloud.workspace.id, newSource, file);
+        } else {
+          await saveStoredSource(newSource);
+          await saveStoredFile(sourceId, file);
+        }
 
         // Notify parent state
         if (onSourceAdded) {
@@ -709,10 +719,10 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
           <div className="p-12 text-center space-y-3">
             <RefreshCw className="w-8 h-8 text-[#F36B3F] animate-spin mx-auto" />
             <div className="text-sm font-bold text-neutral-800 dark:text-[#FFF4E3]">
-              Loading Project Sources from IndexedDB...
+              {cloud ? 'Loading Project Sources from Workspace Cloud...' : 'Loading Project Sources from IndexedDB...'}
             </div>
             <p className="text-xs text-neutral-500 dark:text-[#8E8DAF] max-w-sm mx-auto">
-              Synchronizing local browser persistence with active workspace.
+              {cloud ? 'Loading records scoped to this authenticated workspace.' : 'Loading local browser persistence for the demo workspace.'}
             </p>
           </div>
         ) : viewState === 'error' ? (
