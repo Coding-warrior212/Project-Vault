@@ -56,6 +56,15 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
   const unverifiedCount = claims.filter((c) => c.verificationStatus === 'unverified').length;
   const conflictedCount = claims.filter((c) => c.verificationStatus === 'conflicted').length;
   const totalClaims = claims.length;
+  const isSampleWorkspace = currentWorkspace.id.startsWith('ws-');
+  const claimCoverage = totalClaims === 0 ? 0 : Math.round((verifiedCount / totalClaims) * 100);
+  const visibleWorkflowStages = isSampleWorkspace ? workflowStages : workflowStages.map((stage) => ({
+    ...stage,
+    status: stage.id === 'CONNECT' ? (sources.length > 0 ? 'completed' as const : 'in_progress' as const)
+      : stage.id === 'RECONSTRUCT' ? (claims.length > 0 ? 'completed' as const : sources.length > 0 ? 'in_progress' as const : 'awaiting' as const)
+      : stage.id === 'VERIFY' ? (claims.length > 0 ? 'in_progress' as const : 'awaiting' as const)
+      : 'awaiting' as const,
+  }));
 
   // Real vs Demo sources tracking
   const userUploadedCount = sources.filter((s) => s.isUserUploaded).length;
@@ -75,9 +84,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="max-w-2xl space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-mono tracking-wider uppercase px-2.5 py-0.5 rounded-md bg-[#F36B3F] text-white font-extrabold shadow-xs">
-                DEMO PROJECT — SAMPLE DATA
-              </span>
+              {isSampleWorkspace && <span className="text-[10px] font-mono tracking-wider uppercase px-2.5 py-0.5 rounded-md bg-[#F36B3F] text-white font-extrabold shadow-xs">DEMO PROJECT — SAMPLE DATA</span>}
               <span className="text-xs text-white/70">
                 Workspace Code: <strong className="text-white font-mono">{currentWorkspace.code}</strong>
               </span>
@@ -192,7 +199,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
               {verifiedCount}
             </span>
             <span className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold font-mono">
-              / {totalClaims} grounded ({Math.round((verifiedCount / totalClaims) * 100)}%)
+              / {totalClaims} grounded ({claimCoverage}%)
             </span>
           </div>
           <div className="mt-3 pt-3 border-t border-neutral-100 dark:border-[#2D2C68] flex items-center justify-between text-xs text-neutral-500 dark:text-[#8E8DAF]">
@@ -273,7 +280,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
 
         {/* 5-Stage Stepper Container */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-          {workflowStages.map((stage) => {
+          {visibleWorkflowStages.map((stage) => {
             const isCompleted = stage.status === 'completed';
             const isInProgress = stage.status === 'in_progress';
             const isAwaiting = stage.status === 'awaiting';
@@ -282,9 +289,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
             const getStageMetric = () => {
               switch (stage.id) {
                 case 'CONNECT':
-                  return userUploadedCount > 0
-                    ? `${userUploadedCount} uploaded (${demoCount} demo)`
-                    : `${sources.length} demo sources`;
+                  return isSampleWorkspace ? (userUploadedCount > 0 ? `${userUploadedCount} uploaded (${demoCount} demo)` : `${sources.length} demo sources`) : `${sources.length} sources connected`;
                 case 'RECONSTRUCT':
                   return `${claims.length} claims synthesized`;
                 case 'VERIFY':
@@ -292,7 +297,7 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({
                 case 'REVIEW':
                   return `${unverifiedCount + conflictedCount} pending · ${conflictedCount} conflicts`;
                 case 'HANDOVER':
-                  return `${verifiedCount} of ${claims.length} approved (${Math.round((verifiedCount / claims.length) * 100)}%)`;
+                  return `${verifiedCount} of ${claims.length} approved (${claimCoverage}%)`;
                 default:
                   return stage.metrics;
               }
