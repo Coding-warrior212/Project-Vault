@@ -13,12 +13,12 @@ fi
 
 docker run --rm -d --name "$CONTAINER" -e POSTGRES_PASSWORD=local-only postgres:17-alpine >/dev/null
 for attempt in $(seq 1 60); do
-  if docker exec "$CONTAINER" pg_isready -U postgres >/dev/null 2>&1; then break; fi
+  if docker exec "$CONTAINER" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then break; fi
   sleep 1
 done
 docker exec "$CONTAINER" pg_isready -U postgres >/dev/null
 
-docker exec -i "$CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < "$ROOT/supabase/tests/local-bootstrap.sql"
+docker exec -i "$CONTAINER" psql -h 127.0.0.1 -v ON_ERROR_STOP=1 -U postgres -d postgres < "$ROOT/supabase/tests/local-bootstrap.sql"
 docker exec -i "$CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < "$ROOT/supabase/migrations/202611140001_projectvault_round3.sql"
 docker exec -i "$CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < "$ROOT/supabase/tests/round3_schema_assertions.sql"
 docker exec -i "$CONTAINER" psql -v ON_ERROR_STOP=1 -U postgres -d postgres < "$ROOT/supabase/tests/local-adversarial-smoke.sql"
