@@ -1,15 +1,15 @@
 # ProjectVault Round 3 — Milestone Status
 
-**Snapshot:** 2026-11-14 (CI passed on `389a5d2`; security hardening committed afterward and awaits CI)  
+**Snapshot:** 2026-11-14 (Gemini fail-closed cleanup committed as `b8f43be`; local re-verification pending)  
 **Repository:** `Coding-warrior212/Project-Vault`  
 **Working branch:** `round3-development`  
 **Target:** preserve `main` and the hosted Supabase project until explicit release approval.
 
 ## Executive status
 
-The Round 3 branch contains the 14-table draft schema, RLS/triggers/RPCs, a local PostgreSQL 17 validation harness, a server-side invite redemption boundary, and automated CI. The workflow for commit `389a5d2` completed successfully: both the application checks and PostgreSQL 17 migration/adversarial smoke-test jobs passed. A subsequent Vite config compatibility fix removed the legacy `__dirname` warning; the newer Gemini fail-closed security change is awaiting CI.
+The Round 3 branch contains the 14-table draft schema, RLS/triggers/RPCs, a local PostgreSQL 17 validation harness, a server-side invite redemption boundary, and automated CI. The workflow for commit `389a5d2` completed successfully: both application checks and PostgreSQL 17 migration/adversarial smoke-test jobs passed. The subsequent Gemini fail-closed change exposed TypeScript errors because legacy unreachable handler bodies remained below early returns. Commit `b8f43be` removes those obsolete bodies and the now-unused Gemini SDK/schema helpers; the endpoints remain explicitly unavailable (HTTP 503) until workspace authorization is implemented. Re-run CI and local checks for `b8f43be` before treating the cleanup as verified.
 
-The local PostgreSQL 17 migration and adversarial smoke harness has passed after the invite-replay SQL regression fix (user-reported terminal output). The server invite suite passed 5/5; TypeScript lint (`tsc --noEmit`) passed; and the Vite production build completed successfully (1,681 modules). The build emitted non-blocking warnings for `__dirname` compatibility with Vite's future native config loader and a JavaScript chunk above 500 KB. The connected Supabase project is active on PostgreSQL 17 but reports zero applied migrations; Security, Performance and Health Advisors currently return no findings on the empty schema. Those empty-schema results are not evidence that the proposed schema is secure.
+The local PostgreSQL 17 migration and adversarial smoke harness has passed after the invite-replay SQL regression fix (user-reported terminal output). On the user's checkout at `4897a27`, server invite tests passed 5/5 and the Vite production build completed (1,681 modules; main JS chunk 962.13 KB, non-blocking size warning). TypeScript lint failed with 14 errors in legacy Gemini handler code; commit `b8f43be` removes that unreachable code. User-side verification of the new commit is pending. The connected Supabase project is active on PostgreSQL 17 but reports zero applied migrations; Security, Performance and Health Advisors currently return no findings on the empty schema. Those empty-schema results are not evidence that the proposed schema is secure.
 
 No hosted migration, production data/schema change, deployment, PR merge, or secret modification has been performed.
 
@@ -41,7 +41,7 @@ The invite endpoint behavior is locally verified by the 5-test suite. The produc
 
 ## Latest local checkout confirmation
 
-The user pulled `origin/round3-development` successfully from `7426dc4` to `2734c4d` using a fast-forward update. No conflicts were reported. The user's earlier local verification passed: server tests 5/5, lint, production build, and local PostgreSQL 17 migration/smoke harness. Re-run the same checks after subsequent code changes. This is local-only validation; do not connect the test command to the hosted Supabase project.
+The user pulled `origin/round3-development` successfully from `7426dc4` to `2734c4d` using a fast-forward update. No conflicts were reported. The user's earlier local verification passed server tests 5/5, lint, production build, and the local PostgreSQL 17 migration/smoke harness. On `4897a27`, tests still passed but lint failed with 14 errors; commit `b8f43be` removes the unreachable legacy Gemini implementation. Re-run server tests, lint, build and local PostgreSQL harness after pulling that commit. This is local-only validation; do not connect the test command to the hosted Supabase project.
 
 No Supabase secrets are needed for these local tests. Do not add a real secret key to Git, `.env.example`, Vite-prefixed variables, or the browser bundle.
 
@@ -63,3 +63,10 @@ Use only zero-cost local tooling and existing free allowances. Do not introduce 
 - Changed both Gemini POST endpoints to fail closed with a clear `WORKSPACE_AUTHORIZATION_REQUIRED` response until the application has authenticated sessions and server-verified workspace membership.
 - This is intentionally a temporary availability trade-off: current frontend calls do not carry authenticated session/workspace context. Do not re-enable these endpoints merely by adding a bearer-header presence check; verify the token with Supabase Auth and authorize the requested workspace/source server-side first.
 - Latest security commit still requires CI and local WSL verification. No production resources were touched.
+
+
+## Follow-up cleanup (commit `b8f43be`)
+
+- Removed the unreachable legacy Gemini extraction and conflict-analysis implementations and their unused SDK/schema/helper code. This resolves the source of the TypeScript errors without weakening the fail-closed behavior.
+- Both Gemini POST endpoints still return HTTP 503 with `WORKSPACE_AUTHORIZATION_REQUIRED`; no Gemini calls or quota use can occur through these routes until verified session and workspace authorization are implemented.
+- The user's verification of `4897a27` reported 14 TypeScript errors in the unreachable legacy code. Server invite tests passed 5/5 and Vite build completed. Pull and re-run checks on `b8f43be`; no local pass is claimed yet.
