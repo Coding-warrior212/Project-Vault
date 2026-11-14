@@ -624,7 +624,7 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
             <div className="p-3 bg-neutral-50 dark:bg-[#14133B] rounded-lg border-2 border-neutral-200 dark:border-[#2D2C68] space-y-2">
               {githubSources.length > 0 ? githubSources.slice(0, 2).map((source) => <div key={source.id} className="border-b border-neutral-200 pb-2 last:border-0 last:pb-0 dark:border-[#2D2C68]">
                 <div className="flex items-center justify-between gap-2 text-xs">
-                  <span className="truncate font-mono font-bold text-neutral-800 dark:text-[#FFF4E3]">{source.githubOwner}/{source.githubRepo}</span>
+                  <span className="truncate font-mono font-bold text-neutral-800 dark:text-[#FFF4E3]">{source.title}</span>
                   <span className="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">Connected</span>
                 </div>
                 <div className="mt-1 flex items-center gap-2 font-mono text-[10px] text-neutral-500 dark:text-[#8E8DAF]"><span>Branch: {source.repoBranch || 'default'}</span><span>·</span><span>Commit: {source.commitSha?.slice(0, 7) || 'snapshot'}</span></div>
