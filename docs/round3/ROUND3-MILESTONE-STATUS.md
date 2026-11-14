@@ -76,3 +76,21 @@ Use only zero-cost local tooling and existing free allowances. Do not introduce 
 
 - Updated the reconstruction modal to clearly state that AI reconstruction is temporarily unavailable until authenticated workspace authorization is implemented. The extraction action is visibly disabled rather than inviting users to submit documents to a route that correctly fails closed.
 - Existing knowledge review remains available. This is a user-experience honesty improvement, not completion of the AI/authentication milestone. Commit `bdc60e6` awaits local and CI verification.
+
+## Milestone 3 implementation update (2026-11-14)
+
+The branch now contains the first integrated browser authentication and workspace-access gate:
+
+- `src/lib/supabase.ts` creates a browser Supabase client only when `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are configured. HTTPS is required except for localhost HTTP development URLs. The browser client never imports or exposes the server secret key.
+- `src/components/auth/AuthGate.tsx` restores persisted sessions, subscribes to Auth state changes, supports email/password sign-in and registration, Google OAuth, password reset, and sign-out.
+- The authenticated workspace portal queries `workspace_members` filtered to the current Auth user, then retrieves only those workspace records. Database RLS remains the actual authorization boundary; client-side filtering is not treated as security.
+- The portal redeems invitation codes through the existing `/api/workspaces/redeem-invite` endpoint using the current access token. The server validates the token with Supabase Auth and derives the user ID itself.
+- `src/main.tsx` mounts the gate. If browser Supabase configuration is absent, the existing sample UI remains available with a visible local-demo-mode banner; no private workspace is loaded in this fallback.
+- `.env.example` now documents the two browser-safe `VITE_` variables separately from server-only `SUPABASE_SECRET_KEY`.
+
+**Important scope boundary:** Once Auth is configured, the authenticated portal intentionally does not mount the old sample-data application for private workspaces. The existing project screens still use local demo state and must not be mistaken for a cloud-backed private workspace. The portal reports verified membership and role only; loading private records belongs to Milestone 4.
+
+**Verification:** GitHub Actions application job for commit `5fdc270` passed server tests, TypeScript typecheck and Vite production build. The pull-request PostgreSQL job failed while starting the disposable Docker-based validation container (after pulling `postgres:17-alpine`); the failure occurred before migration output and is not evidence of a SQL assertion failure. The earlier user-run local PostgreSQL 17 migration/adversarial harness remains the latest successful database validation. Re-run the database workflow before signing off this milestone. The push-triggered workflow run is pending at this snapshot.
+
+**Not yet verified:** live Supabase Auth provider configuration, Google OAuth callback configuration, email confirmation/reset delivery, PostgREST RLS behavior on the managed project, actual invitation redemption against managed Auth/PostgREST, and the full sign-up → invite → workspace membership flow. No production migration or secret change was made.
+
