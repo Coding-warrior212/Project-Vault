@@ -21,6 +21,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [session, setSession] = React.useState<Session | null>(null);
   const [authLoading, setAuthLoading] = React.useState(true);
   const [mode, setMode] = React.useState<AuthMode>('sign_in');
+  const [isPasswordRecovery, setIsPasswordRecovery] = React.useState(false);
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [fullName, setFullName] = React.useState('');
@@ -39,8 +40,9 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
     }
 
     let active = true;
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (active) {
+        if (event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true);
         setSession(nextSession);
         setError('');
         setMessage('');
@@ -208,6 +210,21 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
     }
   };
 
+  const handleSetNewPassword = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!supabase || password.length < 8) return;
+    setBusy(true);
+    setError('');
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    setBusy(false);
+    if (updateError) setError(updateError.message);
+    else {
+      setPassword('');
+      setIsPasswordRecovery(false);
+      setMessage('Your password has been updated.');
+    }
+  };
+
   const handleSignOut = async () => {
     if (!supabase) return;
     setBusy(true);
@@ -266,6 +283,23 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
         <div className="my-5 flex items-center gap-3 text-xs text-slate-400"><span className="h-px flex-1 bg-slate-200" />or continue with<span className="h-px flex-1 bg-slate-200" /></div>
         <button type="button" onClick={handleGoogleSignIn} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"><Chrome className="h-4 w-4" /> Continue with Google</button>
         <p className="mt-4 text-center text-[11px] text-slate-500">Your workspace access is enforced by Supabase Row Level Security, not by client-side filtering alone.</p>
+        <AuthFeedback error={error} message={message} />
+      </AuthShell>
+    );
+  }
+
+  if (session && isPasswordRecovery) {
+    return (
+      <AuthShell>
+        <div className="mb-6 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-950 text-white"><LockKeyhole className="h-6 w-6" /></div>
+          <h1 className="text-2xl font-bold text-slate-950">Choose a new password</h1>
+          <p className="mt-2 text-sm text-slate-600">Set a new password for {session.user.email}.</p>
+        </div>
+        <form onSubmit={handleSetNewPassword} className="space-y-3">
+          <input className={fieldClass} type="password" minLength={8} autoComplete="new-password" placeholder="New password (at least 8 characters)" value={password} onChange={(event) => setPassword(event.target.value)} required />
+          <button className={buttonClass + ' w-full'} type="submit" disabled={busy || password.length < 8}>{busy ? 'Updating…' : 'Update password'}</button>
+        </form>
         <AuthFeedback error={error} message={message} />
       </AuthShell>
     );
