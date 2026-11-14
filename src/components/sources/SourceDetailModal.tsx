@@ -372,6 +372,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
                   <span>Download</span>
                 </button>
               </div>
+              {downloadError && <p role="alert" className="mt-2 text-[11px] text-rose-600">{downloadError}</p>}
             </div>
 
             {/* TAB 1: Full Extracted Text */}
