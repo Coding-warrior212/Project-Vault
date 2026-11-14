@@ -44,6 +44,7 @@ import {
   saveStoredMissingInfo,
   getAllStoredQuestions,
   saveStoredQuestions,
+  clearJudgeDemoPersistence,
 } from './services/db';
 import {
   INITIAL_CONFLICTS,
@@ -538,22 +539,32 @@ export default function App() {
     }
   };
 
-  // Reset sample data
+  // Reset only the isolated Judge Demo namespace and restore the original sample state.
   const handleResetSampleData = async () => {
     if (activeWorkspaceId) {
       alert('Sample data reset is disabled in authenticated workspaces. Your shared team data has not been changed.');
       return;
     }
+
     try {
-      const stored = await getAllStoredSources();
-      setSources([...stored, ...INITIAL_SOURCES]);
-      const storedClaims = await getAllStoredClaims();
-      setClaims([...storedClaims, ...INITIAL_CLAIMS]);
-    } catch {
+      await clearJudgeDemoPersistence();
       setSources(INITIAL_SOURCES);
       setClaims(INITIAL_CLAIMS);
+      setConflicts(INITIAL_CONFLICTS);
+      setMissingInfo(INITIAL_MISSING_INFO);
+      setQuestions(INITIAL_QUESTIONS);
+      setActivity(SAMPLE_ACTIVITY);
+      setInspectingClaim(null);
+      setInspectingSource(null);
+      setReconstructingSource(null);
+      setIsReconstructModalOpen(false);
+      setIsConnectModalOpen(false);
+      setLedgerSourceFilter('all');
+      alert('Judge Demo sample data has been restored. Your normal ProjectVault workspace data was not changed.');
+    } catch (error) {
+      console.error('Judge Demo reset failed:', error);
+      alert('Judge Demo could not be reset. No success was reported; please retry after checking browser storage permissions.');
     }
-    setActivity(SAMPLE_ACTIVITY);
   };
 
   // Header primary action router
