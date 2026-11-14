@@ -50,7 +50,7 @@ import {
 } from './data/sampleData';
 import { ProjectConflict, MissingInfoFinding, UnresolvedQuestion } from './types';
 import { useWorkspaceSession } from './components/auth/WorkspaceSessionContext';
-import { appendWorkspaceActivity, deleteWorkspaceSource, loadWorkspaceData, saveWorkspaceClaims, saveWorkspaceConflicts, saveWorkspaceMissingInfo, saveWorkspaceQuestions, saveWorkspaceSource, subscribeWorkspaceChanges } from './services/workspaceCloud';
+import { appendWorkspaceActivity, deleteWorkspaceSource, loadWorkspaceData, saveWorkspaceClaims, saveWorkspaceConflicts, saveWorkspaceMissingInfo, saveWorkspaceQuestions, saveWorkspaceSource, subscribeWorkspaceChanges, updateWorkspaceClaim } from './services/workspaceCloud';
 
 export default function App() {
   const cloud = useWorkspaceSession();
@@ -319,7 +319,7 @@ export default function App() {
 
     // 3. Persist to storage (IndexedDB + localStorage) with diagnostics
     try {
-      if (activeWorkspaceId) await saveWorkspaceClaims(activeWorkspaceId, [updatedClaim]);
+      if (activeWorkspaceId) await updateWorkspaceClaim(activeWorkspaceId, updatedClaim);
       else await saveStoredClaims([updatedClaim]);
       console.log(`[DIAGNOSTIC] Successfully saved updated claim ${claimId} co-persisted.`);
     } catch (err) {
