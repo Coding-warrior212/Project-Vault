@@ -51,6 +51,13 @@ export const Header: React.FC<HeaderProps> = ({
           actionIcon: ChevronRight,
           breadcrumb: 'Knowledge Ledger',
         };
+      case 'graph':
+        return {
+          title: 'Knowledge Graph & Change Impact',
+          actionLabel: 'Connect Source',
+          actionIcon: Plus,
+          breadcrumb: 'Knowledge Graph',
+        };
       case 'review':
         return {
           title: 'Human-in-the-Loop Review Workbench',
