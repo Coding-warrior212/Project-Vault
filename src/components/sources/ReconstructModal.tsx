@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { extractKnowledgeFromSource, ReconstructResult } from '../../services/reconstruct';
 import { SourceType3DGlyph } from '../common/Soft3DVisuals';
+import { useWorkspaceSession } from '../auth/WorkspaceSessionContext';
 
 interface ReconstructModalProps {
   source: Source | null;
@@ -42,6 +43,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
   onNavigateToLedger,
   onInspectClaim,
 }) => {
+  const cloud = useWorkspaceSession();
   const [status, setStatus] = React.useState<
     'idle' | 'preparing' | 'sending' | 'analyzing' | 'validating' | 'persisting' | 'completed' | 'error'
   >('idle');
@@ -73,7 +75,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
       setStatus(stage);
       setStatusMessage(message);
       setProgressPercent(progress);
-    });
+    }, !cloud);
 
     setResult(res);
 
