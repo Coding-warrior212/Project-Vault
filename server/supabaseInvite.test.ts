@@ -25,7 +25,7 @@ test('invite codes normalize and reject malformed values', () => {
 });
 
 test('invite code hash is stable SHA-256 hex', () => {
-  assert.equal(hashInviteCode('PV-AB12-CD34'), 'e4b17c52b0f6b4c6c0b17e9f1e15eac2a91ec4f82c5b6b7b3e5d6f9b4e2a1d7a'.length === 64 ? hashInviteCode('PV-AB12-CD34') : '');
+  assert.equal(hashInviteCode('PV-AB12-CD34'), '02078f170fe5942c520e314f176e1406759f1cdc03801933a71da64e6b592ccb');
   assert.match(hashInviteCode('PV-AB12-CD34'), /^[0-9a-f]{64}$/);
 });
 
