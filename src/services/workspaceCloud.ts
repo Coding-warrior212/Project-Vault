@@ -177,3 +177,45 @@ export async function subscribeWorkspaceChanges(workspaceId: string, onChange: (
   await channel.subscribe();
   return () => { void client().removeChannel(channel); };
 }
+
+export type WorkspaceHandover = {
+  id: string; title: string; versionLabel: string; targetAudience: string;
+  executiveNote: string; finalComment: string; checklist: Record<string, boolean>;
+  isApproved: boolean; approvedBy: string;
+};
+export async function loadWorkspaceHandover(workspaceId: string): Promise<WorkspaceHandover | null> {
+  const ws=requiredWorkspace(workspaceId);
+  const {data,error}=await client().from('handovers').select('*').eq('workspace_id',ws).maybeSingle();
+  if(error)throw error; if(!data)return null;
+  return {id:data.id,title:data.title,versionLabel:data.version_label,targetAudience:data.target_audience,
+    executiveNote:data.executive_note,finalComment:data.final_comment,checklist:data.checklist ?? {},
+    isApproved:data.is_approved,approvedBy:data.approved_by ?? ''};
+}
+export async function saveWorkspaceHandover(workspaceId: string, draft: {
+  title:string; executiveNote:string; finalComment:string; checklist:Record<string,boolean>;
+  isApproved:boolean; approvedBy:string;
+}) {
+  const ws=requiredWorkspace(workspaceId); const db=client();
+  const {data:{user}}=await db.auth.getUser(); if(!user)throw new Error('Your session expired. Sign in again.');
+  const {data:existing,error:readError}=await db.from('handovers').select('id').eq('workspace_id',ws).maybeSingle();
+  if(readError)throw readError;
+  const payload={workspace_id:ws,title:draft.title,executive_note:draft.executiveNote,final_comment:draft.finalComment,
+    checklist:draft.checklist,is_approved:draft.isApproved,approved_by:draft.isApproved?draft.approvedBy:null,
+    approved_by_user_id:draft.isApproved?user.id:null,approved_at:draft.isApproved?new Date().toISOString():null};
+  const result=existing
+    ? await db.from('handovers').update(payload).eq('workspace_id',ws).eq('id',existing.id)
+    : await db.from('handovers').insert(payload);
+  if(result.error)throw result.error;
+  if(draft.isApproved) await appendWorkspaceActivity(ws,{id:'act-'+crypto.randomUUID(),type:'handover_drafted',
+    timestamp:'Just now',title:'Handover approved',description:'Human reviewer approved the workspace handover dossier.',
+    actor:draft.approvedBy});
+}
+export async function downloadWorkspaceSourceFile(workspaceId: string, sourceId: string) {
+  const ws=requiredWorkspace(workspaceId); const db=client();
+  const {data,error}=await db.from('source_files').select('storage_bucket,storage_path,filename')
+    .eq('workspace_id',ws).eq('source_id',sourceId).order('created_at',{ascending:false}).limit(1).maybeSingle();
+  if(error)throw error; if(!data)throw new Error('No cloud file is attached to this source.');
+  const {data:signed,error:signedError}=await db.storage.from(data.storage_bucket).createSignedUrl(data.storage_path,60);
+  if(signedError)throw signedError; if(!signed?.signedUrl)throw new Error('A secure download link could not be created.');
+  return {url:signed.signedUrl,filename:data.filename};
+}
