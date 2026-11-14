@@ -43,6 +43,14 @@
 - The handover page listens for workspace realtime changes.
 - Viewer access remains constrained by database RLS.
 
+### 7. Interactive Judge Demo
+- Judges can enter from the sign-in screen or workspace-access portal without joining or changing a team workspace.
+- The demo renders the normal interactive application for the currently implemented workflows; it is not a read-only preview.
+- Demo source files, claims, review state, and handover notes use a separate browser-local IndexedDB database, localStorage key namespace, and in-memory fallback.
+- Reset clears only the Judge Demo namespace. It surfaces an error if the isolated IndexedDB database cannot be cleared; Exit Demo returns to the normal local storage scope.
+- The app's sample data is reloaded when the demo is entered again after reset.
+- Browser-level verification of isolation, reset, and the full interaction path remains open.
+
 ## Security design
 - Browser code uses only the Supabase publishable key.
 - The Supabase secret/service-role key is never exposed through a `VITE_` variable.
@@ -65,7 +73,7 @@ The local Supabase Auth lifecycle test previously passed signup, password login,
 - The hosted Supabase project has not been linked or migrated; no hosted schema/data changes have been made.
 - Google OAuth provider configuration has not been verified in the Supabase dashboard.
 - AI extraction and conflict analysis remain disabled pending secure server-side authorization.
-- The judge demo is interactive and storage-namespaced in code, but it still needs browser verification of entry, edits across all supported workflows, reset-to-seed behavior, and proof that pre-existing browser-local records remain unchanged.
+- The interactive judge demo's storage isolation and reset logic are implemented and covered by namespace unit tests; browser verification of entry, edits across supported workflows, reset-to-seed behavior, and preservation of pre-existing browser-local records remains open.
 - GitHub private-repository OAuth and scheduled/background sync are not included.
 - The knowledge graph is source-to-claim evidence tracing, not full graph-node/edge persistence or automatic dependency propagation.
 - Deployment, PR merge, production migration, final PDF refresh, and submission have not been performed.
