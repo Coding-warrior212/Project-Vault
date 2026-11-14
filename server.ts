@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, Type } from '@google/genai';
+import { createInviteRouter } from './server/supabaseInvite';
 
 dotenv.config();
 
@@ -21,6 +22,9 @@ const PORT = Number(process.env.PORT) || 3000;
 // Increase payload limit for large document texts
 app.use(express.json({ limit: '35mb' }));
 app.use(express.urlencoded({ extended: true, limit: '35mb' }));
+
+// Server-side workspace invite redemption (user identity is verified by Supabase Auth).
+app.use(createInviteRouter());
 
 // Initialize shared Gemini SDK client
 const apiKey = process.env.GEMINI_API_KEY;
