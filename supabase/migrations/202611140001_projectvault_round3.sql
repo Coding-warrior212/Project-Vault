@@ -42,15 +42,15 @@ CREATE TABLE IF NOT EXISTS private.operation_capabilities(
 ALTER TABLE private.operation_capabilities ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE private.operation_capabilities FROM PUBLIC,anon,authenticated,service_role;
 CREATE OR REPLACE FUNCTION private.has_operation_capability(p_operation text)
-RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,private AS $
+RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,private AS $$
  SELECT EXISTS(SELECT 1 FROM private.operation_capabilities c WHERE c.transaction_id=pg_catalog.pg_current_xact_id() AND c.operation=p_operation);
-$;
+$$;
 CREATE OR REPLACE FUNCTION private.operation_actor(p_operation text)
-RETURNS uuid LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,private AS $
+RETURNS uuid LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,private AS $$
  SELECT c.actor_id FROM private.operation_capabilities c WHERE c.transaction_id=pg_catalog.pg_current_xact_id() AND c.operation=p_operation;
-$;
+$$;
 CREATE OR REPLACE FUNCTION private.grant_operation_capability(p_operation text,p_actor_id uuid DEFAULT NULL)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,private AS $
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,private AS $$
 BEGIN
  IF p_operation NOT IN('seed','owner_management','system_event','claim_cleanup','invite_redeem','invite_revoke') THEN RAISE EXCEPTION 'Unsupported internal capability' USING ERRCODE='42501'; END IF;
  INSERT INTO private.operation_capabilities(transaction_id,operation,actor_id) VALUES(pg_catalog.pg_current_xact_id(),p_operation,p_actor_id) ON CONFLICT DO NOTHING;
@@ -656,7 +656,7 @@ BEGIN
   DELETE FROM private.operation_capabilities WHERE transaction_id=pg_catalog.pg_current_xact_id() AND operation='claim_cleanup';
   RETURN OLD;
 END;
-$;
+$$;
 
 -- 4.6 Owner safety + member role-change field guards
 CREATE OR REPLACE FUNCTION public.enforce_workspace_member_guards()
@@ -1326,7 +1326,7 @@ $$;
 
 
 CREATE OR REPLACE FUNCTION public.enforce_workspace_invite_lifecycle()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,auth,storage AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,auth,storage AS $$
 DECLARE v_role text;
 BEGIN
  IF TG_OP='INSERT' THEN
@@ -2005,7 +2005,7 @@ BEGIN
   DELETE FROM private.operation_capabilities WHERE transaction_id=pg_catalog.pg_current_xact_id() AND operation IN('owner_management','system_event');
   RETURN v_workspace;
 END;
-$;
+$$;
 
 -- 6.2 Atomic Ownership Transfer (only current owner; blocks demo; locks rows)
 CREATE OR REPLACE FUNCTION public.transfer_workspace_ownership_atomic(
@@ -2105,7 +2105,7 @@ BEGIN
   DELETE FROM private.operation_capabilities WHERE transaction_id=pg_catalog.pg_current_xact_id() AND operation IN('owner_management','system_event');
   RETURN QUERY SELECT p_target_user_id, v_caller_id, p_demote_previous_to;
 END;
-$;
+$$;
 
 -- 6.3 Atomic Invite Redemption (service_role only, called via rate-limited Express route)
 CREATE OR REPLACE FUNCTION public.redeem_workspace_invite_by_hash_atomic(
@@ -2196,7 +2196,7 @@ BEGIN
   DELETE FROM private.operation_capabilities WHERE transaction_id=pg_catalog.pg_current_xact_id() AND operation IN('invite_redeem','system_event');
   RETURN QUERY SELECT v_invite.workspace_id, v_invite.granted_role, false;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.create_workspace_atomic(text, text, text, text, uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.create_workspace_atomic(text, text, text, text, uuid) TO authenticated, service_role;
