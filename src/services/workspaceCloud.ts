@@ -158,20 +158,21 @@ export async function deleteWorkspaceSource(workspaceId: string, sourceId: strin
   const {error}=await db.from('sources').delete().eq('workspace_id',ws).eq('id',sourceId);
   if(error)throw error;
 }
-export async function uploadWorkspaceSourceFile(workspaceId: string, source: Source, file: File) {
+export async function uploadWorkspaceSourceFile(workspaceId: string, source: Source, file: File, cleanupSourceOnFailure = true) {
   const ws=requiredWorkspace(workspaceId); const db=client();
   const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'_').slice(-120) || 'source.bin';
   const path=ws+'/'+source.id+'/'+crypto.randomUUID()+'-'+safeName;
   const bucket='projectvault-sources';
   const {error:uploadError}=await db.storage.from(bucket).upload(path,file,{contentType:file.type || 'application/octet-stream',upsert:false});
-  if(uploadError){ await db.from('sources').delete().eq('workspace_id',ws).eq('id',source.id); throw uploadError; }
+  if(uploadError){ if(cleanupSourceOnFailure) await db.from('sources').delete().eq('workspace_id',ws).eq('id',source.id); throw uploadError; }
   const {data:{user}}=await db.auth.getUser();
-  if(!user){await db.storage.from(bucket).remove([path]);await db.from('sources').delete().eq('workspace_id',ws).eq('id',source.id);throw new Error('Your session expired. Sign in again.');}
+  if(!user){await db.storage.from(bucket).remove([path]);if(cleanupSourceOnFailure) await db.from('sources').delete().eq('workspace_id',ws).eq('id',source.id);throw new Error('Your session expired. Sign in again.');}
   const {error:metadataError}=await db.from('source_files').insert({
     workspace_id:ws,source_id:source.id,storage_bucket:bucket,storage_path:path,
     filename:file.name,mime_type:file.type || 'application/octet-stream',size_bytes:file.size,created_by:user.id,
   });
-  if(metadataError){await db.storage.from(bucket).remove([path]);await db.from('sources').delete().eq('workspace_id',ws).eq('id',source.id);throw metadataError;}
+  if(metadataError){await db.storage.from(bucket).remove([path]);if(cleanupSourceOnFailure) await db.from('sources').delete().eq('workspace_id',ws).eq('id',source.id);throw metadataError;}
+  return path;
 }
 export function subscribeWorkspaceChanges(workspaceId: string, onChange: () => void, channelSuffix = 'app') {
   const ws=requiredWorkspace(workspaceId);
