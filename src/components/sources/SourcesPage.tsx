@@ -108,6 +108,7 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
   // Counters
   const userUploadedCount = sources.filter((s) => s.isUserUploaded).length;
   const demoSourcesCount = sources.length - userUploadedCount;
+  const githubSources = sources.filter((source) => source.type === 'github');
 
   // Filter sources
   const filteredSources = sources.filter((source) => {
@@ -382,7 +383,7 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
               </span>
               <span className="text-[10px] font-mono px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 rounded border border-emerald-300 dark:border-emerald-700/50 font-bold flex items-center gap-1">
                 <HardDrive className="w-3 h-3" />
-                INDEXEDDB LOCAL PERSISTENCE ACTIVE
+                {cloud ? 'PRIVATE WORKSPACE CLOUD ACTIVE' : 'INDEXEDDB LOCAL PERSISTENCE ACTIVE'}
               </span>
               <span className="text-neutral-300 dark:text-neutral-600">·</span>
               <span className="text-xs text-neutral-600 dark:text-[#C4C3E0] font-mono">
@@ -393,7 +394,7 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
               Project Artifacts & Evidence Repository
             </h2>
             <p className="text-xs text-neutral-600 dark:text-[#C4C3E0] max-w-2xl leading-relaxed">
-              Upload actual engineering specifications, PDF architectural blueprints, and Markdown runbooks. ProjectVault extracts verbatim text client-side via WebAssembly and persists sources directly in your browser's IndexedDB. Data remains local to your device.
+              {cloud ? 'Upload engineering specifications and runbooks. Extracted content and original files are stored in this authenticated workspace with member-scoped access.' : 'Upload engineering specifications, PDF blueprints, and Markdown runbooks. Extracted content and files stay in this browser’s IndexedDB.'}
             </p>
           </div>
 
@@ -612,24 +613,22 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
                 GitHub Repository Connector
               </h3>
               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded border border-purple-200 dark:border-purple-800/40">
-                Phase 3 Integration
+                Public Repo Snapshot
               </span>
             </div>
 
             <p className="text-xs text-neutral-600 dark:text-[#C4C3E0] leading-relaxed">
-              Connect private GitHub repositories to automatically parse architectural ADRs, proto schemas, and CI/CD workflow configurations alongside uploaded specifications.
+              Snapshot documentation from public GitHub repositories. ProjectVault captures the selected branch commit, README, and up to seven Markdown documentation files; use Sync latest to refresh it.
             </p>
 
             <div className="p-3 bg-neutral-50 dark:bg-[#14133B] rounded-lg border-2 border-neutral-200 dark:border-[#2D2C68] space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-mono text-neutral-800 dark:text-[#FFF4E3] font-bold">apex-fleet/telemetry-gateway</span>
-                <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">Connected</span>
-              </div>
-              <div className="text-[11px] text-neutral-500 dark:text-[#8E8DAF] flex items-center gap-2 font-mono">
-                <span>Branch: main</span>
-                <span>·</span>
-                <span>Demo repo attached</span>
-              </div>
+              {githubSources.length > 0 ? githubSources.slice(0, 2).map((source) => <div key={source.id} className="border-b border-neutral-200 pb-2 last:border-0 last:pb-0 dark:border-[#2D2C68]">
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate font-mono font-bold text-neutral-800 dark:text-[#FFF4E3]">{source.githubOwner}/{source.githubRepo}</span>
+                  <span className="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">Connected</span>
+                </div>
+                <div className="mt-1 flex items-center gap-2 font-mono text-[10px] text-neutral-500 dark:text-[#8E8DAF]"><span>Branch: {source.repoBranch || 'default'}</span><span>·</span><span>Commit: {source.commitSha?.slice(0, 7) || 'snapshot'}</span></div>
+              </div>) : <p className="text-xs text-neutral-500 dark:text-[#8E8DAF]">No public GitHub documentation snapshots connected yet.</p>}
             </div>
           </div>
 
@@ -638,7 +637,7 @@ export const SourcesPage: React.FC<SourcesPageProps> = ({
             className="w-full py-2.5 text-xs font-bold text-[#25245F] dark:text-[#FFF4E3] bg-[#FFF4E3] dark:bg-[#25245F] hover:bg-[#FFE8C2] dark:hover:bg-[#2F2D73] border-2 border-[#25245F]/40 dark:border-[#55C7C2]/40 rounded-lg shadow-[2px_2px_0px_rgba(37,36,95,0.15)] dark:shadow-[2px_2px_0px_rgba(85,199,194,0.2)] active:translate-x-[1px] active:translate-y-[1px] transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <Github className="w-3.5 h-3.5 text-[#25245F] dark:text-[#55C7C2]" />
-            <span>Connect Another Repository (Preview)</span>
+            <span>Connect Public Repository</span>
           </button>
         </div>
       </div>
