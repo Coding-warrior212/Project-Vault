@@ -35,6 +35,9 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [workspaceLoading, setWorkspaceLoading] = React.useState(false);
   const [inviteCode, setInviteCode] = React.useState('');
   const [inviteBusy, setInviteBusy] = React.useState(false);
+  const [createWorkspaceBusy, setCreateWorkspaceBusy] = React.useState(false);
+  const [workspaceName, setWorkspaceName] = React.useState('');
+  const [workspaceDescription, setWorkspaceDescription] = React.useState('');
   const [demoMode, setDemoMode] = React.useState(false);
   const [demoResetBusy, setDemoResetBusy] = React.useState(false);
 
@@ -186,6 +189,39 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
     setBusy(false);
     if (resetError) setError(resetError.message);
     else setMessage('If an account exists for that email, a password reset link has been sent.');
+  };
+
+  const handleCreateWorkspace = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!supabase || !session || workspaceName.trim().length < 2) return;
+    setCreateWorkspaceBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      // Workspace ownership is assigned atomically by the database from auth.uid().
+      // The browser never supplies an owner/user ID and never uses a service key.
+      const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const random = new Uint8Array(8);
+      crypto.getRandomValues(random);
+      const code = 'PV-' + Array.from(random, (value) => alphabet[value % alphabet.length]).join('');
+      const { error: createError } = await supabase.rpc('create_workspace_atomic', {
+        p_name: workspaceName.trim(),
+        p_code: code,
+        p_description: workspaceDescription.trim(),
+        p_project_type: 'Engineering Continuity',
+        p_owner_id: null,
+      });
+      if (createError) throw createError;
+      setWorkspaceName('');
+      setWorkspaceDescription('');
+      setMessage('Workspace created. Your owner membership is being verified from the database.');
+      await loadWorkspaceAccess();
+    } catch (createError) {
+      console.error('[ProjectVault Auth] Workspace creation failed:', createError);
+      setError(createError instanceof Error ? createError.message : 'Workspace creation failed. Please try again.');
+    } finally {
+      setCreateWorkspaceBusy(false);
+    }
   };
 
   const handleInviteRedeem = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -394,6 +430,16 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
           <div className="grid gap-3 sm:grid-cols-2">{workspaces.map((workspace) => <button type="button" key={workspace.id} onClick={() => setActiveWorkspace(workspace)} className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-indigo-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-300"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900">{workspace.name}</p><p className="mt-1 font-mono text-[11px] text-slate-500">{workspace.code}</p></div><span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase text-indigo-800">{workspace.role}</span></div><p className="mt-3 text-xs leading-5 text-slate-600">{workspace.description || workspace.projectType}</p><p className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-teal-700"><CheckCircle2 className="h-3.5 w-3.5" /> Membership verified · Open workspace <ArrowRight className="ml-auto h-4 w-4" /></p></button>)}</div>
         }
       </div>
+
+      <form onSubmit={handleCreateWorkspace} className="mt-6 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
+        <label className="mb-2 block text-sm font-bold text-slate-900" htmlFor="projectvault-workspace-name">Create a team workspace</label>
+        <div className="grid gap-2">
+          <input id="projectvault-workspace-name" className={fieldClass} placeholder="e.g. Project Atlas" value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} minLength={2} maxLength={120} required />
+          <textarea className={fieldClass} placeholder="Short description (optional)" value={workspaceDescription} onChange={(event) => setWorkspaceDescription(event.target.value)} maxLength={500} rows={2} />
+          <button className={buttonClass + ' w-full sm:w-auto sm:justify-self-start'} type="submit" disabled={createWorkspaceBusy || workspaceName.trim().length < 2}>{createWorkspaceBusy ? 'Creating securely…' : 'Create workspace'}</button>
+        </div>
+        <p className="mt-2 text-[11px] leading-5 text-slate-600">The database creates the workspace and assigns its owner in one transaction using your verified Supabase identity. No browser-supplied user ID or privileged key is used.</p>
+      </form>
 
       <form onSubmit={handleInviteRedeem} className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <label className="mb-2 block text-sm font-bold text-slate-900" htmlFor="projectvault-invite">Join with an invitation code</label>
