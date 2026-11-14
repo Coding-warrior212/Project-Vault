@@ -1,13 +1,13 @@
 # ProjectVault Round 3 — Milestone Status
 
-**Snapshot:** 2026-11-14 (local validation and GitHub Actions CI confirmed)  
+**Snapshot:** 2026-11-14 (CI passed on `389a5d2`; security hardening committed afterward and awaits CI)  
 **Repository:** `Coding-warrior212/Project-Vault`  
 **Working branch:** `round3-development`  
 **Target:** preserve `main` and the hosted Supabase project until explicit release approval.
 
 ## Executive status
 
-The Round 3 branch contains the 14-table draft schema, RLS/triggers/RPCs, a local PostgreSQL 17 validation harness, a server-side invite redemption boundary, and automated CI. The latest workflow run for commit `2734c4d` completed successfully: both the application checks and PostgreSQL 17 migration/adversarial smoke-test jobs passed.
+The Round 3 branch contains the 14-table draft schema, RLS/triggers/RPCs, a local PostgreSQL 17 validation harness, a server-side invite redemption boundary, and automated CI. The workflow for commit `389a5d2` completed successfully: both the application checks and PostgreSQL 17 migration/adversarial smoke-test jobs passed. A subsequent Vite config compatibility fix removed the legacy `__dirname` warning; the newer Gemini fail-closed security change is awaiting CI.
 
 The local PostgreSQL 17 migration and adversarial smoke harness has passed after the invite-replay SQL regression fix (user-reported terminal output). The server invite suite passed 5/5; TypeScript lint (`tsc --noEmit`) passed; and the Vite production build completed successfully (1,681 modules). The build emitted non-blocking warnings for `__dirname` compatibility with Vite's future native config loader and a JavaScript chunk above 500 KB. The connected Supabase project is active on PostgreSQL 17 but reports zero applied migrations; Security, Performance and Health Advisors currently return no findings on the empty schema. Those empty-schema results are not evidence that the proposed schema is secure.
 
@@ -17,7 +17,7 @@ No hosted migration, production data/schema change, deployment, PR merge, or sec
 
 | # | Milestone | Current status | Verified progress | Remaining blockers / acceptance evidence |
 |---|---|---|---|---|
-| 1 | Development foundation | In progress | `round3-development` exists; draft PR #1 remains unmerged; local server tests (5/5), TypeScript lint, Vite build, and PostgreSQL 17 migration smoke tests pass on the user's WSL machine. GitHub Actions run for `2734c4d` passed both CI jobs. | Review remaining branch diff and resolve non-blocking Vite config/chunk warnings when safely justified. |
+| 1 | Development foundation | In progress | `round3-development` exists; draft PR #1 remains unmerged; local server tests (5/5), TypeScript lint, Vite build, and PostgreSQL 17 migration smoke tests pass on the user's WSL machine. GitHub Actions run for `2734c4d` passed both CI jobs. | Review remaining branch diff and address the remaining large-chunk warning; rerun CI for latest security commit. |
 | 2 | Supabase foundation | Open — not signed off | 14-table migration and RLS/security assertions are drafted. PostgreSQL 17 local migration/adversarial smoke harness passed; invite route tests passed 5/5. Hosted project remains at zero migrations and is unchanged. Empty-schema Security/Performance/Health Advisors report no findings. | Verify managed Supabase roles, RPC ownership/grants, PostgREST transaction capabilities, Storage, Auth and Realtime on an approved disposable environment. Review advisors again after schema exists. Define file replacement semantics. |
 | 3 | Authentication and RBAC | In progress — not complete | Five-role policy model and service-role-only invite RPC are in the draft migration. Invite route validates the user through Supabase Auth, rejects anonymous users, derives the user ID from Auth, hashes codes server-side and calls the RPC with the server-only secret key. | Add frontend Email/Password + Google Auth, session lifecycle, profile/workspace loading, invite creation/revocation APIs and UI, and full role-based route guards. Execute tests. |
 | 4 | Cloud persistence and realtime | Not started | Local IndexedDB/localStorage remains available; draft cloud schema exists. | Implement Supabase data adapter and Storage upload/download/delete, idempotent local-to-cloud importer with orphan filtering and row-count verification, Realtime subscriptions, and preserve existing local data until verified. |
@@ -47,7 +47,7 @@ No Supabase secrets are needed for these local tests. Do not add a real secret k
 
 ## Security gates that remain explicit
 
-- The Gemini extraction/conflict endpoints in `server.ts` still accept requests without a verified Supabase session or workspace authorization; the current frontend calls them without an auth token. This exposes server-side Gemini quota and is a release-blocking security issue. The app also has no Supabase Auth UI or cloud persistence adapter, so the SQL migration is not yet an integrated production application. Do not present the current hosted app as a secure multi-tenant deployment until session verification, workspace contributor authorization, frontend session wiring, and negative tests are complete.
+- The Gemini extraction/conflict endpoints in `server.ts` have now been changed to fail closed with HTTP 503 until verified sessions and workspace authorization are integrated; the status endpoint no longer discloses whether a provider secret is configured. This deliberately disables AI extraction/conflict analysis in the current unauthenticated client rather than expose Gemini quota. It is an interim mitigation, not the completed authorization implementation; add protected, workspace-scoped routes and negative tests before re-enabling AI. The app also has no Supabase Auth UI or cloud persistence adapter, so the SQL migration is not yet an integrated production application. Do not present the current hosted app as a secure multi-tenant deployment until session verification, workspace contributor authorization, frontend session wiring, and negative tests are complete.
 - Storage UPDATE is deliberately denied. Same-key upsert/replacement is unsupported until a constrained update policy is designed and tested; keep the current fail-closed policy meanwhile.
 - The local PostgreSQL stubs do not prove Supabase-managed Auth, PostgREST, Storage, Realtime, key handling, or role behavior.
 - The hosted project must remain unchanged until the disposable-environment gates pass and a separate explicit production approval is given.
@@ -55,3 +55,11 @@ No Supabase secrets are needed for these local tests. Do not add a real secret k
 ## Free-only and release constraints
 
 Use only zero-cost local tooling and existing free allowances. Do not introduce paid infrastructure, apply migrations to production, alter live data/schema, deploy, merge PRs, or change secrets without explicit approval.
+
+
+## Latest security hardening (commit `5071eec`)
+
+- Removed the provider-secret presence disclosure from `GET /api/gemini/status`; it now reports the AI capability as unavailable without exposing secret configuration.
+- Changed both Gemini POST endpoints to fail closed with a clear `WORKSPACE_AUTHORIZATION_REQUIRED` response until the application has authenticated sessions and server-verified workspace membership.
+- This is intentionally a temporary availability trade-off: current frontend calls do not carry authenticated session/workspace context. Do not re-enable these endpoints merely by adding a bearer-header presence check; verify the token with Supabase Auth and authorize the requested workspace/source server-side first.
+- Latest security commit still requires CI and local WSL verification. No production resources were touched.
