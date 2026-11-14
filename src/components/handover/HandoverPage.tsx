@@ -42,7 +42,7 @@ import {
 } from 'lucide-react';
 import { HandoverDossier3D } from '../common/Soft3DVisuals';
 import { useWorkspaceSession } from '../auth/WorkspaceSessionContext';
-import { loadWorkspaceHandover, saveWorkspaceHandover } from '../../services/workspaceCloud';
+import { loadWorkspaceHandover, saveWorkspaceHandover, subscribeWorkspaceChanges } from '../../services/workspaceCloud';
 
 interface HandoverPageProps {
   currentWorkspace: Workspace;
@@ -101,7 +101,9 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
   React.useEffect(() => {
     if (!cloud) return;
     let active = true;
-    void loadWorkspaceHandover(cloud.workspace.id).then((record) => {
+    let unsubscribe: (() => void) | undefined;
+    const refresh = async () => {
+      const record = await loadWorkspaceHandover(cloud.workspace.id);
       if (!active || !record) return;
       setExecutiveNote(record.executiveNote || HANDOVER_TEMPLATE.summary);
       setApproverName(record.approvedBy || '');
@@ -112,11 +114,16 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
         evidence: Boolean(record.checklist.evidence),
       });
       setIsApproved(record.isApproved);
+    };
+    void refresh().then(() => {
+      if (active) unsubscribe = subscribeWorkspaceChanges(cloud.workspace.id, () => {
+        void refresh().catch((error) => console.error('Realtime handover refresh failed:', error));
+      });
     }).catch((error) => {
       console.error('Handover load failed:', error);
       if (active) setApprovalError('Shared handover state could not be loaded. Please retry before approving.');
     });
-    return () => { active = false; };
+    return () => { active = false; unsubscribe?.(); };
   }, [cloud?.workspace.id]);
 
 
