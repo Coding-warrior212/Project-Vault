@@ -46,6 +46,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
       if (active) {
         if (event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true);
         setSession(nextSession);
+        if (!nextSession) { setActiveWorkspace(null); setWorkspaces([]); }
         setError('');
         setMessage('');
       }
@@ -108,6 +109,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
         role: roleByWorkspace.get(workspace.id) ?? 'viewer',
       }));
       setWorkspaces(allowed);
+      setActiveWorkspace((current) => current && !allowed.some((workspace) => workspace.id === current.id) ? null : current);
     } catch (loadError) {
       console.error('[ProjectVault Auth] Workspace access lookup failed:', loadError);
       setWorkspaces([]);
