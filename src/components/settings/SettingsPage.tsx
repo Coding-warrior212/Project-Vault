@@ -183,7 +183,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 Gemini API Knowledge Synthesizer
               </div>
               <div className="text-neutral-500 dark:text-[#8E8DAF] text-[11px]">
-                AI extraction and conflict analysis are temporarily disabled until verified sign-in and workspace authorization are enforced server-side.
+                Gemini-powered extraction and conflict analysis remain paused until server-side sign-in and workspace authorization are enforced and verified.
               </div>
             </div>
             <span className="text-[10px] font-mono font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800/40">
@@ -198,11 +198,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 PostgreSQL & Supabase Persistence
               </div>
               <div className="text-neutral-500 dark:text-[#8E8DAF] text-[11px]">
-                Supabase SDK is installed. Auth, workspace-scoped cloud persistence, Storage, and Realtime are not connected yet.
+                Supabase Auth, workspace-scoped PostgreSQL persistence, and Storage are connected. Realtime subscription behavior still needs end-to-end verification.
               </div>
             </div>
             <span className="text-[10px] font-mono font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800/40">
-              SDK installed · integration pending
+              Connected · Realtime QA pending
             </span>
           </div>
 
@@ -213,11 +213,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 GitHub REST API & Webhooks
               </div>
               <div className="text-neutral-500 dark:text-[#8E8DAF] text-[11px]">
-                GitHub repository synchronization and change-impact analysis are planned; no repository connection is active.
+                Manual synchronization is available for public GitHub repositories. Private-repository OAuth, webhooks, and background sync are not connected. Change-impact views currently use derived source-to-claim evidence links.
               </div>
             </div>
             <span className="text-[10px] font-mono font-semibold text-neutral-600 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800/40 px-2 py-0.5 rounded border border-neutral-300 dark:border-neutral-700">
-              Not connected
+              Public repo sync available
             </span>
           </div>
         </div>
