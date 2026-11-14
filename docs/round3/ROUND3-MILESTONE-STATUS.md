@@ -1,6 +1,6 @@
 # ProjectVault Round 3 — Milestone Status
 
-**Snapshot:** 2026-11-14 (server verification passed locally and in CI at `a005208`; AI-paused UI update `bdc60e6` awaits verification)  
+**Snapshot:** 2026-11-14 (Milestone 3 AuthGate implementation at `65aa8ea`; application and PostgreSQL CI both passed on the PR workflow)  
 **Repository:** `Coding-warrior212/Project-Vault`  
 **Working branch:** `round3-development`  
 **Target:** preserve `main` and the hosted Supabase project until explicit release approval.
@@ -19,7 +19,7 @@ No hosted migration, production data/schema change, deployment, PR merge, or sec
 |---|---|---|---|---|
 | 1 | Development foundation | In progress | `round3-development` exists; draft PR #1 remains unmerged; local server tests (5/5), TypeScript lint, Vite build, and PostgreSQL 17 migration smoke tests pass on the user's WSL machine. GitHub Actions run for `2734c4d` passed both CI jobs. | Review remaining branch diff and address the remaining large-chunk warning; rerun CI for latest security commit. |
 | 2 | Supabase foundation | Open — not signed off | 14-table migration and RLS/security assertions are drafted. PostgreSQL 17 local migration/adversarial smoke harness passed; invite route tests passed 5/5. Hosted project remains at zero migrations and is unchanged. Empty-schema Security/Performance/Health Advisors report no findings. | Verify managed Supabase roles, RPC ownership/grants, PostgREST transaction capabilities, Storage, Auth and Realtime on an approved disposable environment. Review advisors again after schema exists. Define file replacement semantics. |
-| 3 | Authentication and RBAC | In progress — not complete | Five-role policy model and service-role-only invite RPC are in the draft migration. Invite route validates the user through Supabase Auth, rejects anonymous users, derives the user ID from Auth, hashes codes server-side and calls the RPC with the server-only secret key. | Add frontend Email/Password + Google Auth, session lifecycle, profile/workspace loading, invite creation/revocation APIs and UI, and full role-based route guards. Execute tests. |
+| 3 | Authentication and RBAC | In progress — Auth UI and RLS-backed membership portal implemented | Five-role policy model and service-role-only invite RPC are drafted. The browser now supports email/password sign-in and registration, Google OAuth, password reset/update, persistent session restoration, sign-out, authenticated invite redemption, and a membership portal that queries the signed-in user's workspace memberships under RLS. Application typecheck/build and PostgreSQL 17 migration/adversarial CI both pass on `65aa8ea`. | Verify real Auth provider configuration and email/OAuth callbacks on a disposable Supabase stack; exercise invite redemption against real Auth/PostgREST; add invite creation/revocation UI and role-aware operations when cloud data adapter is integrated. No hosted migration applied. |
 | 4 | Cloud persistence and realtime | Not started | Local IndexedDB/localStorage remains available; draft cloud schema exists. | Implement Supabase data adapter and Storage upload/download/delete, idempotent local-to-cloud importer with orphan filtering and row-count verification, Realtime subscriptions, and preserve existing local data until verified. |
 | 5 | Three promised improvements | Not complete | Draft tables include workspace collaboration and graph nodes/edges. | Connect shared workspaces to live app state; implement user-authorized GitHub repository sync; implement graph construction and evidence-linked change-impact/staleness propagation. |
 | 6 | Judge Demo | Partial design only | Migration includes a seeded Apex demo workspace and policies intended to keep it read-only. | App still boots from local sample data; wire a one-click read-only demo path, prove no private-workspace visibility or mutation, and block Gemini/quota-consuming operations for demo visitors. |
@@ -94,3 +94,13 @@ The branch now contains the first integrated browser authentication and workspac
 
 **Not yet verified:** live Supabase Auth provider configuration, Google OAuth callback configuration, email confirmation/reset delivery, PostgREST RLS behavior on the managed project, actual invitation redemption against managed Auth/PostgREST, and the full sign-up → invite → workspace membership flow. No production migration or secret change was made.
 
+
+
+## Milestone 3 verification follow-up (2026-11-14, commit `65aa8ea`)
+
+- Added password-recovery callback handling and an authenticated password-update form.
+- Hardened browser configuration detection to reject placeholder values and permit HTTP only for localhost Supabase development; deployed Supabase URLs must use HTTPS.
+- GitHub Actions PR run `43576399121` passed both jobs: server tests, TypeScript typecheck, Vite production build, and local PostgreSQL 17 migration/adversarial smoke tests.
+- The browser client uses only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The service/secret key remains server-only. Supabase Auth persists and refreshes sessions using the SDK; authorization of workspace rows is still enforced by database RLS.
+- The authenticated portal intentionally stops at verified workspace membership metadata. It does not claim that private workspace source/claim records are cloud-loaded. That integration is Milestone 4.
+- Live Auth provider configuration, email delivery, Google OAuth callback, actual managed Supabase RLS, and real invite redemption remain unverified. The hosted Supabase project has not been changed. Do not mark Milestone 3 complete until disposable Supabase runtime tests pass.
