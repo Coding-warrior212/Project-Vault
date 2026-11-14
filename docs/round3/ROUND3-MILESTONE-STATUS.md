@@ -7,7 +7,7 @@
 
 ## Executive status
 
-The Round 3 branch is **45 commits ahead of `main` and 0 behind** at this snapshot. The branch contains the 14-table draft schema, RLS/triggers/RPCs, a local PostgreSQL 17 validation harness, and a new server-side invite redemption boundary.
+The Round 3 branch is **ahead of `main` and 0 behind** at this snapshot. The branch contains the 14-table draft schema, RLS/triggers/RPCs, a local PostgreSQL 17 validation harness, and a new server-side invite redemption boundary.
 
 The user previously ran the local PostgreSQL 17 harness successfully. That PASS predates the latest invite-replay SQL regression and must be repeated. The connected Supabase project currently reports zero migrations and zero tables in `public`/`private`; its empty-schema Security Advisor result is not evidence that the proposed schema is secure.
 
