@@ -28,6 +28,7 @@ import {
 import { saveStoredSource, saveStoredFile, findDuplicateSourceByHash } from '../../services/db';
 import { useWorkspaceSession } from '../auth/WorkspaceSessionContext';
 import { findWorkspaceDuplicateSourceByHash, saveWorkspaceSource, uploadWorkspaceSourceFile } from '../../services/workspaceCloud';
+import { fetchPublicGitHubSnapshot } from '../../services/githubSnapshot';
 
 interface ConnectSourceModalProps {
   isOpen: boolean;
@@ -43,8 +44,8 @@ export const ConnectSourceModal: React.FC<ConnectSourceModalProps> = ({
   const cloud = useWorkspaceSession();
   const [activeTab, setActiveTab] = React.useState<'upload' | 'github' | 'paste'>('upload');
   const [title, setTitle] = React.useState('');
-  const [repoUrl, setRepoUrl] = React.useState('github.com/apex-fleet/safety-monitor');
-  const [branch, setBranch] = React.useState('main');
+  const [repoUrl, setRepoUrl] = React.useState('');
+  const [branch, setBranch] = React.useState('');
   const [summary, setSummary] = React.useState('');
   const [pastedContent, setPastedContent] = React.useState('');
 
@@ -215,27 +216,45 @@ export const ConnectSourceModal: React.FC<ConnectSourceModalProps> = ({
       return;
     }
 
-    // Case 3: GitHub Simulated Repository (Phase 3 preview)
-    const sampleId = `src-gh-${Date.now().toString().slice(-4)}`;
-    const newSource: Source = {
-      id: sampleId,
-      title: title || 'apex-fleet / safety-monitor (main branch)',
-      type: 'github',
-      filename: repoUrl,
-      repoBranch: `${branch} @ head`,
-      size: '8.2 MB repo',
-      ingestedAt: 'Just now',
-      claimsCount: 0,
-      status: 'ingested',
-      extractionStatus: 'success',
-      author: 'Safety Systems Team',
-      summary: summary || 'Automated hardware failsafe watchdog definitions, ISO 26262 ASIL-D safety boundary specs, and thermal throttling limits.',
-      rawExcerpt: 'watchdog_monitor.c: void MonitorHardwareThermalCeiling(int coreTemp) { if (coreTemp > EMERGENCY_THERMAL_LIMIT_C) { TriggerEmergencyHalt(HALT_REASON_OVERHEAT); } }',
-      tags: ['Safety', 'Watchdog', 'Firmware', 'C'],
-    };
-
-    onAddSource(newSource);
-    onClose();
+    // Case 3: Fetch a real, bounded documentation snapshot from a public GitHub repository.
+    setIsProcessing(true);
+    try {
+      const snapshot = await fetchPublicGitHubSnapshot(repoUrl, branch);
+      const textFile = new globalThis.File([snapshot.snapshot], `${snapshot.repo}-${snapshot.branch}-snapshot.md`, { type: 'text/markdown' });
+      const hash = await computeFileHash(textFile);
+      const duplicate = cloud
+        ? await findWorkspaceDuplicateSourceByHash(cloud.workspace.id, hash)
+        : await findDuplicateSourceByHash(hash);
+      if (duplicate) throw new Error(`This exact repository snapshot is already connected as "${duplicate.title}".`);
+      const sourceId = `src-gh-${Date.now().toString().slice(-7)}-${Math.random().toString(36).slice(2, 5)}`;
+      const cleanTitle = title || `${snapshot.owner}/${snapshot.repo} (${snapshot.branch})`;
+      const newSource: Source = {
+        id: sourceId, title: cleanTitle, type: 'github',
+        filename: `${snapshot.owner}/${snapshot.repo}@${snapshot.branch}`,
+        repoBranch: snapshot.branch, githubOwner: snapshot.owner, githubRepo: snapshot.repo,
+        githubUrl: snapshot.url, commitSha: snapshot.commitSha, lastSyncedAt: new Date().toISOString(),
+        size: formatBytes(textFile.size), sizeBytes: textFile.size, ingestedAt: 'Just now',
+        timestamp: Date.now(), claimsCount: 0, status: 'ingested', extractionStatus: 'success',
+        author: snapshot.owner, summary: summary || `${snapshot.description} Snapshot includes ${snapshot.filesIncluded} documentation files at commit ${snapshot.commitSha.slice(0, 12)}.`,
+        rawExcerpt: snapshot.snapshot.slice(0, 300), extractedText: snapshot.snapshot,
+        charCount: snapshot.snapshot.length, wordCount: snapshot.snapshot.trim().split(/\\s+/).length,
+        contentHash: hash, isUserUploaded: true, mimeType: 'text/markdown',
+        tags: ['GitHub', 'Public Repository', 'Documentation Snapshot'],
+      };
+      if (cloud) {
+        await saveWorkspaceSource(cloud.workspace.id, newSource);
+        await uploadWorkspaceSourceFile(cloud.workspace.id, newSource, textFile);
+      } else {
+        await saveStoredSource(newSource);
+        await saveStoredFile(sourceId, textFile);
+      }
+      onAddSource(newSource);
+      onClose();
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Could not connect to this public GitHub repository.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -412,6 +431,8 @@ export const ConnectSourceModal: React.FC<ConnectSourceModalProps> = ({
               </div>
             </div>
           )}
+
+          {activeTab === 'github' && <p className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-[11px] leading-5 text-sky-900">Public repositories only. ProjectVault snapshots the repository README and up to seven Markdown documentation files from the selected branch and records the commit SHA. Private repositories and automatic background sync are not enabled.</p>}
 
           {/* Local Persistence Notice */}
           <div className="p-3 bg-emerald-50/70 dark:bg-emerald-950/30 rounded-lg border-2 border-emerald-300 dark:border-emerald-800/40 text-emerald-900 dark:text-emerald-300 flex items-start gap-2 text-[11px] leading-relaxed">
