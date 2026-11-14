@@ -223,7 +223,7 @@ export async function downloadWorkspaceSourceFile(workspaceId: string, sourceId:
   const {data,error}=await db.from('source_files').select('storage_bucket,storage_path,filename')
     .eq('workspace_id',ws).eq('source_id',sourceId).order('created_at',{ascending:false}).limit(1).maybeSingle();
   if(error)throw error; if(!data)throw new Error('No cloud file is attached to this source.');
-  const {data:signed,error:signedError}=await db.storage.from(data.storage_bucket).createSignedUrl(data.storage_path,60);
+  const {data:signed,error:signedError}=await db.storage.from(data.storage_bucket).createSignedUrl(data.storage_path,60,{download:data.filename});
   if(signedError)throw signedError; if(!signed?.signedUrl)throw new Error('A secure download link could not be created.');
   return {url:signed.signedUrl,filename:data.filename};
 }
