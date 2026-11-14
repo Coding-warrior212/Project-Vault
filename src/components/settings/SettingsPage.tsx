@@ -183,11 +183,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 Gemini API Knowledge Synthesizer
               </div>
               <div className="text-neutral-500 dark:text-[#8E8DAF] text-[11px]">
-                Server-side extraction proxy prepared for PDF chunking and claim extraction.
+                AI extraction and conflict analysis are temporarily disabled until verified sign-in and workspace authorization are enforced server-side.
               </div>
             </div>
-            <span className="text-[10px] font-mono font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/40">
-              Configured in .env
+            <span className="text-[10px] font-mono font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800/40">
+              Paused — authorization pending
             </span>
           </div>
 
@@ -198,11 +198,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 PostgreSQL & Supabase Persistence
               </div>
               <div className="text-neutral-500 dark:text-[#8E8DAF] text-[11px]">
-                Data schema ready for tables: workspaces, sources, claims, audit_events, handovers.
+                Supabase SDK is installed. Auth, workspace-scoped cloud persistence, Storage, and Realtime are not connected yet.
               </div>
             </div>
             <span className="text-[10px] font-mono font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800/40">
-              Next Stage Target
+              SDK installed · integration pending
             </span>
           </div>
 
@@ -213,11 +213,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 GitHub REST API & Webhooks
               </div>
               <div className="text-neutral-500 dark:text-[#8E8DAF] text-[11px]">
-                Automated continuous PR and release tag monitoring for drift detection.
+                GitHub repository synchronization and change-impact analysis are planned; no repository connection is active.
               </div>
             </div>
-            <span className="text-[10px] font-mono font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 rounded border border-purple-200 dark:border-purple-800/40">
-              Connector Ready
+            <span className="text-[10px] font-mono font-semibold text-neutral-600 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800/40 px-2 py-0.5 rounded border border-neutral-300 dark:border-neutral-700">
+              Not connected
             </span>
           </div>
         </div>
