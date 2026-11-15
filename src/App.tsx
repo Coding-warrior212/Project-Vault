@@ -53,7 +53,7 @@ import {
 } from './data/sampleData';
 import { ProjectConflict, MissingInfoFinding, UnresolvedQuestion } from './types';
 import { useWorkspaceSession } from './components/auth/WorkspaceSessionContext';
-import { appendWorkspaceActivity, deleteWorkspaceSource, loadWorkspaceData, saveWorkspaceClaims, saveWorkspaceConflicts, saveWorkspaceMissingInfo, saveWorkspaceQuestions, saveWorkspaceSource, subscribeWorkspaceChanges, updateWorkspaceClaim, uploadWorkspaceSourceFile } from './services/workspaceCloud';
+import { appendWorkspaceActivity, countWorkspaceSourceClaims, deleteWorkspaceSource, loadWorkspaceData, saveWorkspaceClaims, saveWorkspaceConflicts, saveWorkspaceMissingInfo, saveWorkspaceQuestions, saveWorkspaceSource, subscribeWorkspaceChanges, updateWorkspaceClaim, uploadWorkspaceSourceFile } from './services/workspaceCloud';
 
 export default function App() {
   const cloud = useWorkspaceSession();
@@ -184,42 +184,54 @@ export default function App() {
   const [conflictAnalysisResult, setConflictAnalysisResult] = React.useState<{ analyzed: number; discovered: number; timestamp: string } | null>(null);
 
   const handleRunConflictAnalysis = async () => {
+    if (!cloud || !activeWorkspaceId || !cloud.session.access_token) {
+      alert('AI conflict analysis requires a signed-in workspace.');
+      return;
+    }
+
     setIsAnalyzingConflicts(true);
+
     try {
       const res = await fetch('/api/gemini/analyze-conflicts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claims }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cloud.session.access_token}`,
+        },
+        body: JSON.stringify({ workspaceId: activeWorkspaceId }),
       });
+
       const data = await res.json();
-      if (!res.ok) {
+
+      if (!res.ok || !data.success) {
         throw new Error(data.error || 'Conflict analysis request failed.');
       }
 
-      if (data.success && data.conflicts) {
-        // Fetch latest stored conflicts from persistence to avoid stale state
-        const storedConflicts = await getAllStoredConflicts();
-        const baseConflicts = storedConflicts.length > 0 ? storedConflicts : conflicts;
-
+      if (Array.isArray(data.conflicts)) {
+        // Use the current workspace state as the merge base. Never read or write
+        // another workspace's conflicts through browser-side demo persistence.
         const existingMap = new Map<string, ProjectConflict>();
-        baseConflicts.forEach(c => {
-          if (c.relatedClaimIds && c.relatedClaimIds.length >= 2) {
-            const key = c.relatedClaimIds.slice().sort().join('-');
-            existingMap.set(key, c);
+
+        conflicts.forEach((conflict) => {
+          if (conflict.relatedClaimIds && conflict.relatedClaimIds.length >= 2) {
+            const key = conflict.relatedClaimIds.slice().sort().join('-');
+            existingMap.set(key, conflict);
           } else {
-            existingMap.set(c.id, c);
+            existingMap.set(conflict.id, conflict);
           }
         });
 
         let newDiscovered = 0;
-        for (const aiConf of data.conflicts) {
+
+        for (const aiConf of data.conflicts as ProjectConflict[]) {
           const key = aiConf.relatedClaimIds && aiConf.relatedClaimIds.length >= 2
             ? aiConf.relatedClaimIds.slice().sort().join('-')
             : aiConf.id;
 
           if (existingMap.has(key)) {
             const existing = existingMap.get(key)!;
-            // Preserve original ID, review status (resolved/dismissed), notes, and timestamps
+
+            // Preserve review decisions and original identity across AI re-runs.
             existingMap.set(key, {
               ...aiConf,
               id: existing.id,
@@ -235,17 +247,20 @@ export default function App() {
         }
 
         const merged = Array.from(existingMap.values());
+
+        // Persist first; update the UI only after the workspace save succeeds.
+        await saveWorkspaceConflicts(activeWorkspaceId, merged);
         setConflicts(merged);
-        await saveStoredConflicts(merged);
+
         setConflictAnalysisResult({
-          analyzed: data.analyzedCount,
+          analyzed: data.analyzedCount ?? claims.length,
           discovered: newDiscovered,
           timestamp: new Date().toLocaleTimeString(),
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Conflict analysis failed:', err);
-      alert(err.message || 'Failed to run conflict analysis.');
+      alert(err instanceof Error ? err.message : 'Failed to run conflict analysis.');
     } finally {
       setIsAnalyzingConflicts(false);
     }
@@ -307,31 +322,54 @@ export default function App() {
       lastReviewedAt: 'Just now',
     };
 
-    console.log(`[DIAGNOSTIC] handleUpdateClaimStatus updating claim ${claimId}:`, {
-      from: target.verificationStatus,
-      to: newStatus,
-      updatedClaim,
-    });
+    // Persist first. Never show an unconfirmed verification change.
+    try {
+      if (activeWorkspaceId) {
+        await updateWorkspaceClaim(activeWorkspaceId, updatedClaim);
+      } else {
+        await saveStoredClaims([updatedClaim]);
+      }
+    } catch (err) {
+      console.error(`[DIAGNOSTIC] FAILED to persist claim ${claimId}:`, err);
 
-    // 1. Immediately update interface state
-    setClaims((prev) => prev.map((c) => (c.id === claimId ? updatedClaim : c)));
+      const errorInfo = err && typeof err === 'object'
+        ? err as { code?: string; message?: string; details?: string; hint?: string }
+        : {};
 
-    // 2. Update inspecting claim if open
+      const errorText = [
+        errorInfo.message,
+        errorInfo.details,
+        errorInfo.hint,
+      ].filter(Boolean).join(' ').toLowerCase();
+
+      const permissionDenied =
+        errorInfo.code === '42501' ||
+        errorText.includes('rbac_denied') ||
+        errorText.includes('editors cannot verify') ||
+        errorText.includes('permission denied');
+
+      alert(
+        permissionDenied
+          ? 'Permission denied — your workspace role cannot change claim verification status or reviewer metadata. The original claim status was preserved.'
+          : `Could not save the claim update. Your original claim status was preserved. ${
+              errorInfo.message || 'Please check your connection and try again.'
+            }`
+      );
+      return;
+    }
+
+    // Update the interface only after the database confirms the save.
+    setClaims((prev) =>
+      prev.map((claim) => claim.id === claimId ? updatedClaim : claim)
+    );
+
     if (inspectingClaim?.id === claimId) {
       setInspectingClaim(updatedClaim);
     }
 
-    // 3. Persist to storage (IndexedDB + localStorage) with diagnostics
-    try {
-      if (activeWorkspaceId) await updateWorkspaceClaim(activeWorkspaceId, updatedClaim);
-      else await saveStoredClaims([updatedClaim]);
-      console.log(`[DIAGNOSTIC] Successfully saved updated claim ${claimId} co-persisted.`);
-    } catch (err) {
-      console.error(`[DIAGNOSTIC] FAILED to persist updated claim ${claimId}:`, err);
-      throw err;
-    }
+    console.log(`[DIAGNOSTIC] Successfully saved claim ${claimId}.`);
 
-    // 4. Record activity event
+    // Record activity only after successful persistence.
     const eventType =
       newStatus === 'verified'
         ? 'claim_verified'
@@ -350,7 +388,11 @@ export default function App() {
     };
 
     setActivity((prev) => [newActivity, ...prev]);
-    if (activeWorkspaceId) void appendWorkspaceActivity(activeWorkspaceId, newActivity).catch((e) => alert('Activity could not be synchronized: ' + e.message));
+
+    if (activeWorkspaceId) {
+      void appendWorkspaceActivity(activeWorkspaceId, newActivity)
+        .catch((e) => alert('Activity could not be synchronized: ' + e.message));
+    }
   };
 
   // Handle toggling persistent flag state on a claim
@@ -422,43 +464,52 @@ export default function App() {
     setIsReconstructModalOpen(true);
   };
 
-  // Handle knowledge claims reconstructed by Gemini
+  // Persist reconstructed claims before exposing success in the UI.
+  // Existing claims and their human-review history are intentionally preserved.
   const handleClaimsExtracted = async (
     sourceId: string,
     newClaims: KnowledgeClaim[],
     updatedSource: Source
-  ) => {
-    // 1. Update sources state
-    setSources((prev) =>
-      prev.map((s) => (s.id === sourceId ? updatedSource : s))
-    );
+  ): Promise<{ insertedCount: number; totalCount: number }> => {
+    if (!activeWorkspaceId) {
+      throw new Error('No active cloud workspace is available. Sign in again and retry.');
+    }
 
-    // 2. Remove old claims for this source and prepend new claims
-    setClaims((prev) => [
-      ...newClaims,
-      ...prev.filter((c) => c.sourceId !== sourceId),
-    ]);
+    const insertedCount = await saveWorkspaceClaims(activeWorkspaceId, newClaims);
+    const totalSourceClaims = await countWorkspaceSourceClaims(activeWorkspaceId, sourceId);
+    const persistedSource = {
+      ...updatedSource,
+      claimsCount: totalSourceClaims,
+    };
+    await saveWorkspaceSource(activeWorkspaceId, persistedSource);
 
-    // 3. Record Activity event
     const newAct: ActivityEvent = {
       id: `act-${Date.now()}`,
       type: 'knowledge_reconstructed',
       timestamp: 'Just now',
       title: `Knowledge Reconstructed: ${updatedSource.title}`,
-      description: `Synthesized ${newClaims.length} atomic claims with Gemini 3.8 Flash (${newClaims.filter((c) => c.evidenceGrounded).length} grounded to verbatim citations). Stored in IndexedDB.`,
+      description: `Inserted ${insertedCount} new claims; ${totalSourceClaims} claims now exist for this source. ${newClaims.filter((c) => c.evidenceGrounded).length} extracted claims were grounded to verbatim source quotations. Claims remain unverified pending human review.`,
       actor: 'Gemini 3.8 Flash',
       sourceId,
     };
-    setActivity((prev) => [newAct, ...prev]);
-    if (activeWorkspaceId) {
-      try {
-        await saveWorkspaceSource(activeWorkspaceId, updatedSource);
-        await saveWorkspaceClaims(activeWorkspaceId, newClaims);
-        await appendWorkspaceActivity(activeWorkspaceId, newAct);
-      } catch (e) {
-        alert('Reconstructed knowledge could not be saved to the workspace: ' + (e instanceof Error ? e.message : 'unknown error'));
-      }
+
+    // Activity is secondary to the persisted source and claims.
+    try {
+      await appendWorkspaceActivity(activeWorkspaceId, newAct);
+      setActivity((prev) => [newAct, ...prev]);
+    } catch (error) {
+      console.warn('Claims were saved, but the activity event could not be recorded:', error);
     }
+
+    setSources((prev) =>
+      prev.map((item) => item.id === sourceId ? persistedSource : item)
+    );
+    setClaims((prev) => [
+      ...newClaims.filter((claim) => !prev.some((existing) => existing.id === claim.id)),
+      ...prev,
+    ]);
+
+    return { insertedCount, totalCount: totalSourceClaims };
   };
 
   const handleSyncGitHubSource = async (source: Source) => {
@@ -731,6 +782,7 @@ export default function App() {
             <SettingsPage
               currentWorkspace={currentWorkspace}
               onResetSampleData={handleResetSampleData}
+              session={cloud?.session ?? null}
             />
           )}
         </main>

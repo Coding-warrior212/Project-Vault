@@ -132,3 +132,205 @@ test('redemption rejects requests without a bearer session before calling Supaba
   });
   assert.equal(calls, 0);
 });
+
+test('creation generates a one-time code and inserts only its hash using the user session', async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const url = String(input);
+    calls.push({ url, init });
+
+    if (url.endsWith('/auth/v1/user')) {
+      return new Response(JSON.stringify({ id: USER_ID, is_anonymous: false }), { status: 200 });
+    }
+
+    if (url.endsWith('/rest/v1/workspace_invites')) {
+      return new Response(null, { status: 201 });
+    }
+
+    throw new Error(`Unexpected request: ${url}`);
+  };
+
+  const app = express();
+  app.use(express.json());
+  app.use(createInviteRouter({
+    supabaseUrl: 'https://example.supabase.co',
+    publishableKey: 'sb_publishable_test',
+    secretKey: 'sb_secret_test',
+    fetchImpl,
+  }));
+
+  let returnedCode = '';
+
+  await withServer(app, async (url) => {
+    const response = await fetch(`${url}/api/workspaces/create-invite`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer user-session-token',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        workspaceId: 'ws-real',
+        role: 'editor',
+        maxUses: 1,
+        expiresInDays: 7,
+      }),
+    });
+
+    assert.equal(response.status, 201);
+    const result = await response.json() as {
+      code: string;
+      role: string;
+      maxUses: number;
+      expiresAt: string;
+    };
+
+    returnedCode = result.code;
+    assert.match(result.code, /^PV-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+    assert.equal(result.role, 'editor');
+    assert.equal(result.maxUses, 1);
+    assert.ok(Number.isFinite(Date.parse(result.expiresAt)));
+  });
+
+  assert.equal(calls.length, 2);
+
+  const authHeaders = new Headers(calls[0].init?.headers);
+  assert.equal(authHeaders.get('apikey'), 'sb_publishable_test');
+  assert.equal(authHeaders.get('authorization'), 'Bearer user-session-token');
+
+  const insertHeaders = new Headers(calls[1].init?.headers);
+  assert.equal(insertHeaders.get('apikey'), 'sb_publishable_test');
+  assert.equal(insertHeaders.get('authorization'), 'Bearer user-session-token');
+  assert.notEqual(insertHeaders.get('apikey'), 'sb_secret_test');
+
+  const body = JSON.parse(String(calls[1].init?.body));
+  assert.equal(body.workspace_id, 'ws-real');
+  assert.equal(body.code_hash, hashInviteCode(returnedCode));
+  assert.equal(body.code_prefix, returnedCode.slice(0, 7));
+  assert.equal(body.granted_role, 'editor');
+  assert.equal(body.max_uses, 1);
+  assert.ok(Number.isFinite(Date.parse(body.expires_at)));
+  assert.equal('code' in body, false);
+  assert.equal('created_by' in body, false);
+});
+
+test('creation rejects requests without a bearer session', async () => {
+  let calls = 0;
+
+  const app = express();
+  app.use(createInviteRouter({
+    supabaseUrl: 'https://example.supabase.co',
+    publishableKey: 'sb_publishable_test',
+    fetchImpl: async () => {
+      calls += 1;
+      return new Response('{}', { status: 200 });
+    },
+  }));
+
+  await withServer(app, async (url) => {
+    const response = await fetch(`${url}/api/workspaces/create-invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspaceId: 'ws-real' }),
+    });
+    assert.equal(response.status, 401);
+  });
+
+  assert.equal(calls, 0);
+});
+
+test('creation rejects anonymous Supabase users', async () => {
+  let insertCalls = 0;
+
+  const app = express();
+  app.use(createInviteRouter({
+    supabaseUrl: 'https://example.supabase.co',
+    publishableKey: 'sb_publishable_test',
+    fetchImpl: async (input) => {
+      if (String(input).endsWith('/auth/v1/user')) {
+        return new Response(JSON.stringify({ id: USER_ID, is_anonymous: true }), { status: 200 });
+      }
+      insertCalls += 1;
+      return new Response(null, { status: 201 });
+    },
+  }));
+
+  await withServer(app, async (url) => {
+    const response = await fetch(`${url}/api/workspaces/create-invite`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer anonymous-session-token',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ workspaceId: 'ws-real' }),
+    });
+    assert.equal(response.status, 403);
+  });
+
+  assert.equal(insertCalls, 0);
+});
+
+test('creation rejects invalid invitation settings before contacting Supabase', async () => {
+  let calls = 0;
+
+  const app = express();
+  app.use(createInviteRouter({
+    supabaseUrl: 'https://example.supabase.co',
+    publishableKey: 'sb_publishable_test',
+    fetchImpl: async () => {
+      calls += 1;
+      return new Response('{}', { status: 200 });
+    },
+  }));
+
+  await withServer(app, async (url) => {
+    const invalidPayloads = [
+      { workspaceId: '', role: 'editor' },
+      { workspaceId: 'ws-real', role: 'owner' },
+      { workspaceId: 'ws-real', role: 'editor', maxUses: 0 },
+      { workspaceId: 'ws-real', role: 'editor', maxUses: 101 },
+      { workspaceId: 'ws-real', role: 'editor', expiresInDays: 31 },
+    ];
+
+    for (const payload of invalidPayloads) {
+      const response = await fetch(`${url}/api/workspaces/create-invite`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer user-session-token',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      assert.equal(response.status, 400);
+    }
+  });
+
+  assert.equal(calls, 0);
+});
+
+test('creation maps Supabase row-level security rejection to forbidden', async () => {
+  const app = express();
+  app.use(createInviteRouter({
+    supabaseUrl: 'https://example.supabase.co',
+    publishableKey: 'sb_publishable_test',
+    fetchImpl: async (input) => {
+      if (String(input).endsWith('/auth/v1/user')) {
+        return new Response(JSON.stringify({ id: USER_ID, is_anonymous: false }), { status: 200 });
+      }
+      return new Response('new row violates row-level security policy', { status: 403 });
+    },
+  }));
+
+  await withServer(app, async (url) => {
+    const response = await fetch(`${url}/api/workspaces/create-invite`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer user-session-token',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ workspaceId: 'ws-real', role: 'editor' }),
+    });
+
+    assert.equal(response.status, 403);
+  });
+});

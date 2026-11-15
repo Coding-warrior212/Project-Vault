@@ -9,8 +9,19 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createInviteRouter } from './server/supabaseInvite';
+import { authorizeGeminiWorkspace } from './server/geminiAuth';
+import {
+  analyzeKnowledgeConflicts,
+  consumeGeminiRateLimit,
+  extractKnowledge,
+  isGeminiConfigured,
+  normalizeConflictClaims,
+  normalizeStoredPages,
+} from './server/geminiService';
 
-dotenv.config();
+
+dotenv.config({ path: '.env.local' });
+dotenv.config({ path: '.env' });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,12 +41,9 @@ app.use(express.urlencoded({ extended: true, limit: '35mb' }));
  * API Route: Health & Configuration Check
  */
 app.get('/api/gemini/status', (_req: Request, res: Response) => {
-  // Never disclose whether a server-side provider secret is configured.
-  // AI routes remain unavailable until authenticated workspace authorization is wired end-to-end.
   res.json({
     status: 'ok',
-    available: false,
-    reason: 'workspace_authorization_required',
+    available: isGeminiConfigured(),
     model: 'gemini-3.8-flash',
     platform: 'ProjectVault Server-Side Engine',
     timestamp: new Date().toISOString(),
@@ -43,32 +51,200 @@ app.get('/api/gemini/status', (_req: Request, res: Response) => {
 });
 
 /**
- * API Route: Reconstruct Knowledge from Document Text
- *
- * Fail closed until authenticated workspace authorization is implemented.
- * Keep this route intentionally small so disabled legacy code cannot drift
- * into an accidentally reachable or type-unsafe state.
+ * Extract knowledge from a source stored in the authenticated workspace.
+ * The browser supplies identifiers only; source content is retrieved here.
  */
-app.post('/api/gemini/extract-knowledge', (_req: Request, res: Response) => {
-  return res.status(503).json({
-    success: false,
-    error: 'AI extraction is temporarily unavailable until workspace authorization is enabled.',
-    code: 'WORKSPACE_AUTHORIZATION_REQUIRED',
-  });
+app.post('/api/gemini/extract-knowledge', async (req: Request, res: Response) => {
+  const { workspaceId, sourceId } = req.body ?? {};
+
+  if (
+    typeof sourceId !== 'string' ||
+    sourceId.trim().length === 0 ||
+    sourceId.length > 256
+  ) {
+    return res.status(400).json({
+      success: false,
+      error: 'A valid source ID is required.',
+    });
+  }
+
+  const authorization = await authorizeGeminiWorkspace(
+    req.get('authorization'),
+    workspaceId,
+    ['owner', 'admin', 'editor'],
+  );
+
+  if (!authorization.ok) {
+    return res.status(authorization.status).json({
+      success: false,
+      error: authorization.error,
+      isAuth: authorization.status === 401 || authorization.status === 403,
+    });
+  }
+
+  if (!consumeGeminiRateLimit(authorization.userId, 'extract-knowledge', 6)) {
+    return res.status(429).json({
+      success: false,
+      error: 'Too many extraction requests. Please wait before trying again.',
+      isRateLimit: true,
+    });
+  }
+
+  try {
+    const { data: source, error: sourceError } = await authorization.db
+      .from('sources')
+      .select('id, filename, extracted_text, pages')
+      .eq('id', sourceId)
+      .eq('workspace_id', authorization.workspaceId)
+      .maybeSingle();
+
+    if (sourceError) {
+      console.error('[Gemini extraction] Source lookup failed:', sourceError.code);
+      return res.status(503).json({
+        success: false,
+        error: 'The source could not be loaded. Please try again.',
+      });
+    }
+
+    if (!source) {
+      return res.status(404).json({
+        success: false,
+        error: 'The requested source was not found in this workspace.',
+      });
+    }
+
+    if (
+      typeof source.extracted_text !== 'string' ||
+      !source.extracted_text.trim()
+    ) {
+      return res.status(422).json({
+        success: false,
+        error: 'This source has no persisted extracted text. Re-ingest the source before reconstruction.',
+      });
+    }
+
+    const result = await extractKnowledge({
+      sourceId: source.id,
+      filename: source.filename || 'Untitled source',
+      extractedText: source.extracted_text,
+      pages: normalizeStoredPages(source.pages),
+    });
+
+    return res.json({
+      success: true,
+      sourceId: source.id,
+      sourceName: source.filename,
+      ...result,
+    });
+  } catch (error) {
+    console.error(
+      '[Gemini extraction] Request failed:',
+      error instanceof Error ? error.message : 'Unknown error',
+    );
+
+    const message = error instanceof Error ? error.message : '';
+
+    if (message.includes('not configured')) {
+      return res.status(503).json({
+        success: false,
+        error: 'The AI service is temporarily unavailable.',
+      });
+    }
+
+    if (message.includes('too large')) {
+      return res.status(413).json({
+        success: false,
+        error: message,
+      });
+    }
+
+    return res.status(502).json({
+      success: false,
+      error: 'Knowledge extraction failed. Please try again.',
+    });
+  }
 });
 
 /**
- * API Route: Analyze Knowledge Conflicts across Persisted Claims
- *
- * Claims must be loaded from an authorized workspace by the server before
- * this capability can be re-enabled.
+ * Analyze claims loaded directly from the authenticated workspace.
+ * The browser cannot submit or substitute its own claim collection.
  */
-app.post('/api/gemini/analyze-conflicts', (_req: Request, res: Response) => {
-  return res.status(503).json({
-    success: false,
-    error: 'AI conflict analysis is temporarily unavailable until workspace authorization is enabled.',
-    code: 'WORKSPACE_AUTHORIZATION_REQUIRED',
-  });
+app.post('/api/gemini/analyze-conflicts', async (req: Request, res: Response) => {
+  const { workspaceId } = req.body ?? {};
+
+  const authorization = await authorizeGeminiWorkspace(
+    req.get('authorization'),
+    workspaceId,
+    ['owner', 'admin', 'reviewer'],
+  );
+
+  if (!authorization.ok) {
+    return res.status(authorization.status).json({
+      success: false,
+      error: authorization.error,
+      isAuth: authorization.status === 401 || authorization.status === 403,
+    });
+  }
+
+  if (!consumeGeminiRateLimit(authorization.userId, 'analyze-conflicts', 4)) {
+    return res.status(429).json({
+      success: false,
+      error: 'Too many conflict-analysis requests. Please wait before trying again.',
+      isRateLimit: true,
+    });
+  }
+
+  try {
+    const { data: rows, error: claimsError } = await authorization.db
+      .from('claims')
+      .select(
+        'id, statement, source_id, source_name, source_location, source_evidence_quote, category, verification_status, confidence_score, confidence_tier',
+      )
+      .eq('workspace_id', authorization.workspaceId)
+      .limit(301);
+
+    if (claimsError) {
+      console.error('[Gemini conflict analysis] Claims lookup failed:', claimsError.code);
+      return res.status(503).json({
+        success: false,
+        error: 'Workspace claims could not be loaded. Please try again.',
+      });
+    }
+
+    if ((rows ?? []).length > 300) {
+      return res.status(413).json({
+        success: false,
+        error: 'This workspace has more than 300 claims. Narrow the analysis before retrying.',
+      });
+    }
+
+    const claims = normalizeConflictClaims(rows ?? []);
+
+    if (claims.length < 2) {
+      return res.json({
+        success: true,
+        analyzedCount: claims.length,
+        conflicts: [],
+      });
+    }
+
+    const result = await analyzeKnowledgeConflicts({ claims });
+
+    return res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    console.error(
+      '[Gemini conflict analysis] Request failed:',
+      error instanceof Error ? error.message : 'Unknown error',
+    );
+
+    return res.status(502).json({
+      success: false,
+      error: 'Conflict analysis failed. Please try again.',
+    });
+  }
 });
 
 // Start server with Vite middleware in dev or static files in production

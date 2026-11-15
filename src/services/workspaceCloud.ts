@@ -95,7 +95,7 @@ export async function saveWorkspaceSource(workspaceId: string, source: Source) {
 
 export async function saveWorkspaceClaims(workspaceId: string, claims: KnowledgeClaim[]) {
   const ws = requiredWorkspace(workspaceId);
-  if (!claims.length) return;
+  if (!claims.length) return 0;
   const rows = claims.map(c => ({
     id:c.id,workspace_id:ws,source_id:c.sourceId,source_name:c.sourceName,source_location:c.sourceLocation,
     source_evidence_quote:c.sourceEvidenceQuote,source_locator:c.sourceLocator ?? null,page_number:c.pageNumber ?? null,
@@ -109,8 +109,28 @@ export async function saveWorkspaceClaims(workspaceId: string, claims: Knowledge
     last_reviewed_at:c.lastReviewedAt ?? null,is_flagged:c.isFlagged ?? false,flagged_at:c.flaggedAt ?? null,
     flagged_by:c.flaggedBy ?? null,flag_reason:c.flagReason ?? null,
   }));
-  const { error } = await client().from('claims').upsert(rows, { onConflict:'id' });
+  const { data, error } = await client()
+    .from('claims')
+    .upsert(rows, { onConflict:'id', ignoreDuplicates:true })
+    .select('id');
+
   if (error) throw error;
+  return data?.length ?? 0;
+}
+
+export async function countWorkspaceSourceClaims(
+  workspaceId: string,
+  sourceId: string,
+): Promise<number> {
+  const ws = requiredWorkspace(workspaceId);
+  const { count, error } = await client()
+    .from('claims')
+    .select('id', { count:'exact', head:true })
+    .eq('workspace_id', ws)
+    .eq('source_id', sourceId);
+
+  if (error) throw error;
+  return count ?? 0;
 }
 
 export async function saveWorkspaceConflicts(workspaceId: string, items: ProjectConflict[]) {

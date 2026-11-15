@@ -30,7 +30,7 @@ interface ReconstructModalProps {
   source: Source | null;
   isOpen: boolean;
   onClose: () => void;
-  onClaimsExtracted: (sourceId: string, claims: KnowledgeClaim[], updatedSource: Source) => void;
+  onClaimsExtracted: (sourceId: string, claims: KnowledgeClaim[], updatedSource: Source) => Promise<{ insertedCount: number; totalCount: number }>;
   onNavigateToLedger: (sourceId?: string) => void;
   onInspectClaim?: (claim: KnowledgeClaim) => void;
 }
@@ -65,29 +65,88 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
 
   if (!isOpen || !source) return null;
 
+  const hasWorkspaceAccess = Boolean(
+    cloud?.workspace?.id && cloud?.session?.access_token
+  );
+
   const handleStartExtraction = async () => {
+    if (!hasWorkspaceAccess || !cloud) {
+      setStatus('error');
+      setStatusMessage('Sign in to an authorized workspace before starting AI reconstruction.');
+      setResult({
+        success: false,
+        sourceId: source.id,
+        sourceName: source.filename,
+        claims: [],
+        extractedCount: 0,
+        groundedCount: 0,
+        error: 'An authenticated workspace session is required.',
+        isAuth: true,
+      });
+      return;
+    }
+
     setStatus('preparing');
-    setProgressPercent(10);
-    setStatusMessage('Initiating knowledge reconstruction engine...');
+    setProgressPercent(5);
+    setStatusMessage('Preparing secure workspace reconstruction...');
     setResult(null);
 
-    const res = await extractKnowledgeFromSource(source, (stage, message, progress) => {
-      setStatus(stage);
-      setStatusMessage(message);
-      setProgressPercent(progress);
-    }, !cloud);
+    try {
+      const res = await extractKnowledgeFromSource(
+        source,
+        (stage, message, progress) => {
+          if (stage !== 'completed') setStatus(stage);
+          setStatusMessage(message);
+          setProgressPercent(progress);
+        },
+        {
+          workspaceId: cloud.workspace.id,
+          accessToken: cloud.session.access_token,
+        }
+      );
 
-    setResult(res);
+      if (!res.success) {
+        setResult(res);
+        setStatus('error');
+        return;
+      }
 
-    if (res.success) {
+      setStatus('persisting');
+      setProgressPercent(92);
+      setStatusMessage('Saving evidence-grounded claims to your workspace...');
+
       const updatedSource: Source = {
         ...source,
-        claimsCount: res.claims.length,
+        claimsCount: source.claimsCount + res.claims.length,
         reconstructStatus: 'completed',
         reconstructedAt: new Date().toISOString(),
         summary: res.summary || source.summary,
       };
-      onClaimsExtracted(source.id, res.claims, updatedSource);
+
+      const persistence = await onClaimsExtracted(source.id, res.claims, updatedSource);
+
+      setResult(res);
+      setProgressPercent(100);
+      setStatusMessage(
+        `Saved ${persistence.insertedCount} new claims. ${persistence.totalCount} claims now exist for this source.`
+      );
+      setStatus('completed');
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : 'Knowledge extraction or workspace persistence failed.';
+
+      setResult({
+        success: false,
+        sourceId: source.id,
+        sourceName: source.filename,
+        claims: [],
+        extractedCount: 0,
+        groundedCount: 0,
+        error: message,
+      });
+      setStatusMessage(message);
+      setStatus('error');
     }
   };
 
@@ -106,7 +165,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
                   Stage 2 · RECONSTRUCT
                 </span>
                 <span className="text-[10px] font-mono font-bold text-[#F36B3F] bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded border border-orange-200 dark:border-orange-900/40">
-                  AI reconstruction (temporarily unavailable)
+                  SECURE AI RECONSTRUCTION
                 </span>
               </div>
               <h2 className="text-base font-bold text-neutral-900 dark:text-[#FFF4E3] mt-0.5">
@@ -166,7 +225,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
               <div className="space-y-1">
                 <p className="font-bold">Controlled Source Reprocessing</p>
                 <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
-                  This document previously generated {source.claimsCount} claims. Re-running reconstruction will cleanly replace previous claims for this source with fresh, verified evidence assertions. No orphaned or duplicate records will be created.
+                  This document already has {source.claimsCount} claims. A new extraction will add another set of claims. Existing claims, human reviews, and conflict references will be preserved; review the new claims for duplicates before relying on them.
                 </p>
               </div>
             </div>
@@ -180,7 +239,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
                 Evidence Traceability & Untrusted Data Safeguard
               </span>
               <p className="text-[11px] text-neutral-600 dark:text-[#C4C3E0] leading-relaxed">
-                AI reconstruction is temporarily disabled while authenticated workspace authorization is being completed. This fail-closed safeguard prevents unauthenticated document submission and provider quota use. Existing claims remain available for human review; do not interpret sample claims as newly AI-verified evidence.
+                Source text is read by the authenticated server from your authorized workspace. The server validates extracted quotations against the stored source text. AI-generated claims begin as unverified and still require human review.
               </p>
             </div>
           </div>
@@ -193,20 +252,23 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
               </div>
               <div className="max-w-md mx-auto space-y-1">
                 <h4 className="font-bold text-neutral-900 dark:text-[#FFF4E3] text-sm">
-                  AI Reconstruction Temporarily Paused
+                  Ready to Reconstruct Project Knowledge
                 </h4>
                 <p className="text-xs text-neutral-500 dark:text-[#8E8DAF] leading-relaxed">
-                  This capability will return after ProjectVault can verify your sign-in and workspace permissions on the server. You can continue reviewing existing knowledge claims and source evidence.
+                  {hasWorkspaceAccess
+                    ? 'Gemini will analyze the source stored in your authorized workspace and return claims anchored to matching source quotations.'
+                    : 'Sign in to an authorized workspace to enable secure server-side AI reconstruction. Existing claims remain available for review.'}
                 </p>
               </div>
               <button
                 type="button"
-                disabled
-                title="Unavailable until authenticated workspace authorization is implemented"
-                className="px-6 py-2.5 text-xs font-bold text-neutral-500 bg-neutral-200 dark:bg-[#25245F] rounded-lg border-2 border-neutral-300 dark:border-[#2D2C68] cursor-not-allowed inline-flex items-center gap-2 opacity-80"
+                onClick={handleStartExtraction}
+                disabled={!hasWorkspaceAccess}
+                title={hasWorkspaceAccess ? 'Start secure AI knowledge extraction' : 'Sign in to an authorized workspace first'}
+                className="px-6 py-2.5 text-xs font-bold text-white bg-[#F36B3F] hover:bg-[#E0572C] disabled:text-neutral-500 disabled:bg-neutral-200 dark:disabled:bg-[#25245F] rounded-lg border-2 border-[#F36B3F] disabled:border-neutral-300 dark:disabled:border-[#2D2C68] cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-2"
               >
-                <ShieldAlert className="w-4 h-4" />
-                <span>Temporarily unavailable</span>
+                <Sparkles className="w-4 h-4" />
+                <span>{hasWorkspaceAccess ? 'Start Knowledge Extraction' : 'Workspace Sign-in Required'}</span>
               </button>
             </div>
           )}
@@ -218,7 +280,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
                 <div className="flex items-center gap-2.5">
                   <div className="w-6 h-6 rounded-full border-2 border-[#F36B3F] border-t-transparent animate-spin" />
                   <span className="font-bold text-neutral-900 dark:text-[#FFF4E3] text-xs">
-                    AI reconstruction is currently disabled
+                    Secure AI reconstruction in progress
                   </span>
                 </div>
                 <span className="font-mono text-xs font-bold text-[#F36B3F]">{progressPercent}%</span>
@@ -279,7 +341,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
                       Reconstruction Succeeded
                     </h4>
                     <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
-                      Extracted {result.extractedCount} atomic claims ({result.groundedCount} directly anchored to verbatim citations). Stored in IndexedDB.
+                      Extracted {result.extractedCount} atomic claims ({result.groundedCount} directly anchored to verbatim citations). Saved to your workspace.
                     </p>
                   </div>
                 </div>
@@ -355,7 +417,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
         <div className="p-4 border-t-2 border-neutral-200 dark:border-[#2D2C68] flex items-center justify-between bg-neutral-50/70 dark:bg-[#14133B]/60">
           <div className="text-xs text-neutral-500 dark:text-[#8E8DAF] flex items-center gap-1.5">
             <Cpu className="w-3.5 h-3.5 text-[#55C7C2]" />
-            <span>Workspace authorization required · AI paused</span>
+            <span>Gemini 3.8 Flash · Workspace-authorized</span>
           </div>
 
           <div className="flex items-center gap-2">
