@@ -98,8 +98,8 @@ Do not infer individual contributions. Confirm each member's actual work before 
 
 ### CI follow-up — 2026-11-15
 
-GitHub Actions run [#43681275981](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43681275981) completed successfully:
+GitHub Actions run [#43681406630](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43681406630) completed successfully:
 - Server tests, TypeScript typecheck and production build: pass.
 - PostgreSQL 17 job: pass after applying every migration file, including the append-only activity-reference migration, running the updated schema assertions, and executing the cross-workspace reference/source-deletion smoke checks.
 
-A later test-only commit `c7bd137` removes a global JSON parser from the invite-router test setup so the route's own 2 KB limit is tested, and adds an oversized-body 413 test. That newest test change does not yet have a confirmed CI result. The application route itself is mounted before the global 35 MB parser in `server.ts`.
+Commit `c7bd137` removes a global JSON parser from the invite-router test setup so the route's own 2 KB limit is tested, and adds an oversized-body 413 test. Both application and database CI jobs passed on the resulting branch snapshot. The application route is mounted before the global 35 MB parser in `server.ts`.
