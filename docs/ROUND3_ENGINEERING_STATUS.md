@@ -84,3 +84,13 @@ Do not infer individual contributions. Confirm each member's actual work before 
 - Abhijit Gadade
 - Sanmay Dalvi
 - Saksham Singh
+
+
+## 2026-11-15 automation review
+
+- Rechecked the connected hosted Supabase project read-only: PostgreSQL 17.11, `supabase_realtime` publication present, zero application tables and zero migration history rows. No schema/data/Auth/Storage/secret/deployment settings were changed.
+- Found that the previous local validation script applied only the first migration. It now applies all SQL migrations in lexical order. GitHub Actions run [#43681066786](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43681066786) passed both jobs, including the complete migration set and schema assertions.
+- Hardened append-only activity references: the second migration drops source, claim and actor-user `ON DELETE SET NULL` foreign keys and adds same-workspace insert-time validation. Added Realtime subscription to `activity_events`.
+- Commit `47b085b` adds negative local smoke checks for cross-workspace activity references and preservation of audit references after source/claim deletion. A CI result for this latest smoke-test commit is not yet confirmed.
+- Milestone 2 remains open because managed Supabase/PostgREST/Auth/Storage/Realtime behavior and the complete role/concurrency matrix are not verified. The Judge Demo remains interactive and local-only, not strictly read-only as originally agreed. Gemini endpoints remain fail-closed until secure workspace authorization is implemented.
+- No deployment, PR merge, production migration, secret modification, or paid infrastructure was used.
