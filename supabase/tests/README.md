@@ -4,11 +4,10 @@
 
 ## Before applying
 
-1. Confirm the branch is a temporary validation environment.
-2. Confirm the migration is the current branch version:
-   `supabase/migrations/202611140001_projectvault_round3.sql`.
-3. Confirm the branch has no production data. Supabase development branches are fresh databases; do not import production records.
-4. Apply the migration as the database migration owner.
+1. Confirm the target is a disposable local PostgreSQL harness or an explicitly approved temporary Supabase validation environment.
+2. Review every SQL file in `supabase/migrations/` on the current branch; the local runner applies all files in lexical filename order.
+3. Confirm the environment has no production data. Never import production records into the validation database.
+4. Apply the migration set as the database migration owner.
 
 ## Automated assertions
 
@@ -56,7 +55,7 @@ From the repository root, with Docker Desktop installed and running:
 bash scripts/validate-db-local.sh
 ```
 
-The script starts a temporary PostgreSQL 17 container on the local machine, creates minimal stand-ins for Supabase Auth and Storage dependencies, applies the migration, runs schema assertions and runs a demo-lock/custom-GUC smoke test. The container is automatically removed on exit.
+The script starts a temporary PostgreSQL 17 container on the local machine, creates minimal stand-ins for Supabase Auth and Storage dependencies, applies every `supabase/migrations/*.sql` file in lexical order, runs schema assertions, and runs the invite-replay and demo-lock/custom-GUC smoke tests. The container is automatically removed on exit.
 
 The test uses no cloud database and does not change the hosted Supabase project. The first Docker run may download the PostgreSQL image.
 
@@ -77,3 +76,8 @@ These checks do not require Supabase credentials. The invite endpoint itself req
 ## Invite redemption retry regression
 
 The local adversarial smoke script also tests that a one-use invite can be retried idempotently by the same user after a successful redemption, without incrementing `uses_count` a second time. Re-run the full local validation script after changes to the migration or smoke SQL.
+
+
+## Append-only activity reference migration
+
+The migration set removes `ON DELETE SET NULL` foreign keys from activity-event source, claim, and Auth-user identifiers. Those automatic updates conflict with the append-only activity trigger. Historical identifiers remain in the audit row after the related operational record or Auth user is deleted. A BEFORE INSERT trigger validates that any new source/claim reference belongs to the event's workspace. The schema assertions require this trigger and verify that the incompatible foreign keys are absent.
