@@ -33,9 +33,9 @@ const PORT = Number(process.env.PORT) || 3000;
 // Keep the invite endpoint's small, dedicated JSON limit separate from document uploads.
 app.use(createInviteRouter());
 
-// Increase payload limit for large document texts
-app.use(express.json({ limit: '35mb' }));
-app.use(express.urlencoded({ extended: true, limit: '35mb' }));
+// AI endpoints accept identifiers only; document content is fetched from the
+// authenticated workspace. Keep the global API body parser intentionally small.
+app.use(express.json({ limit: '16kb' }));
 
 /**
  * API Route: Health & Configuration Check
