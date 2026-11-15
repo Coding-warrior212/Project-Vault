@@ -19,6 +19,7 @@ interface InviteRouterOptions {
   secretKey?: string;
   fetchImpl?: FetchLike;
   maxAttempts?: number;
+  maxCreateAttempts?: number;
   windowMs?: number;
 }
 
@@ -34,8 +35,46 @@ export function createInviteRouter(options: InviteRouterOptions = {}) {
   const secretKey = options.secretKey ?? process.env.SUPABASE_SECRET_KEY ?? '';
   const fetchImpl = options.fetchImpl ?? fetch;
   const maxAttempts = options.maxAttempts ?? 8;
+  const maxCreateAttempts = options.maxCreateAttempts ?? 5;
   const windowMs = options.windowMs ?? 15 * 60 * 1000;
   const attempts = new Map<string, AttemptWindow>();
+  const createAttempts = new Map<string, AttemptWindow>();
+
+  function consumeAttempt(
+    store: Map<string, AttemptWindow>,
+    key: string,
+    limit: number,
+  ): { allowed: boolean; retryAfterSeconds: number } {
+    const now = Date.now();
+    let entry = store.get(key);
+
+    if (!entry || entry.resetAt <= now) {
+      entry = { count: 0, resetAt: now + windowMs };
+      store.set(key, entry);
+    }
+
+    if (entry.count >= limit) {
+      return {
+        allowed: false,
+        retryAfterSeconds: Math.max(1, Math.ceil((entry.resetAt - now) / 1000)),
+      };
+    }
+
+    entry.count += 1;
+
+    if (store.size > 5000) {
+      for (const [storedKey, value] of store) {
+        if (value.resetAt <= now) store.delete(storedKey);
+      }
+      while (store.size > 5000) {
+        const oldestKey = store.keys().next().value;
+        if (oldestKey === undefined) break;
+        store.delete(oldestKey);
+      }
+    }
+
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
 
 
   router.post('/api/workspaces/create-invite', express.json({ limit: '2kb' }), async (req: Request, res: Response) => {
@@ -92,6 +131,12 @@ export function createInviteRouter(options: InviteRouterOptions = {}) {
         authUser.is_anonymous !== false
       ) {
         return res.status(403).json({ error: 'Only a signed-in workspace member can create an invitation.' });
+      }
+
+      const createLimit = consumeAttempt(createAttempts, authUser.id, maxCreateAttempts);
+      if (!createLimit.allowed) {
+        res.setHeader('Retry-After', String(createLimit.retryAfterSeconds));
+        return res.status(429).json({ error: 'Too many invitations created. Please try again later.' });
       }
 
       // 32-character alphabet: each random byte maps evenly to one character.
