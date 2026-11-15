@@ -51,6 +51,10 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
   const [statusMessage, setStatusMessage] = React.useState<string>('');
   const [result, setResult] = React.useState<ReconstructResult | null>(null);
   const [isReprocessing, setIsReprocessing] = React.useState<boolean>(false);
+  const [pendingPersistence, setPendingPersistence] = React.useState<{
+    result: ReconstructResult;
+    updatedSource: Source;
+  } | null>(null);
 
   React.useEffect(() => {
     if (isOpen && source) {
@@ -60,6 +64,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
       setProgressPercent(0);
       setStatusMessage('');
       setResult(null);
+      setPendingPersistence(null);
     }
   }, [isOpen, source?.id]);
 
@@ -90,6 +95,12 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
     setProgressPercent(5);
     setStatusMessage('Preparing secure workspace reconstruction...');
     setResult(null);
+    setPendingPersistence(null);
+
+    let extractedForPersistence: {
+      result: ReconstructResult;
+      updatedSource: Source;
+    } | null = null;
 
     try {
       const res = await extractKnowledgeFromSource(
@@ -123,8 +134,12 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
         summary: res.summary || source.summary,
       };
 
+      extractedForPersistence = { result: res, updatedSource };
+      setPendingPersistence(extractedForPersistence);
+
       const persistence = await onClaimsExtracted(source.id, res.claims, updatedSource);
 
+      setPendingPersistence(null);
       setResult(res);
       setProgressPercent(100);
       setStatusMessage(
@@ -136,14 +151,65 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
         ? error.message
         : 'Knowledge extraction or workspace persistence failed.';
 
+      if (extractedForPersistence) {
+        const recoveryMessage =
+          `Extraction produced ${extractedForPersistence.result.extractedCount} claims, ` +
+          `but workspace saving did not complete. Some claims may already be saved. ${message}`;
+
+        setResult({
+          ...extractedForPersistence.result,
+          success: false,
+          error: recoveryMessage,
+        });
+        setStatusMessage(recoveryMessage);
+      } else {
+        setResult({
+          success: false,
+          sourceId: source.id,
+          sourceName: source.filename,
+          claims: [],
+          extractedCount: 0,
+          groundedCount: 0,
+          error: message,
+        });
+        setStatusMessage(message);
+      }
+
+      setStatus('error');
+    }
+  };
+
+  const handleRetryPersistence = async () => {
+    if (!pendingPersistence) return;
+
+    const pending = pendingPersistence;
+    setStatus('persisting');
+    setProgressPercent(92);
+    setStatusMessage('Retrying workspace save with the previously extracted claims...');
+
+    try {
+      const persistence = await onClaimsExtracted(
+        pending.updatedSource.id,
+        pending.result.claims,
+        pending.updatedSource,
+      );
+
+      setPendingPersistence(null);
+      setResult(pending.result);
+      setProgressPercent(100);
+      setStatusMessage(
+        `Saved ${persistence.insertedCount} new claims. ${persistence.totalCount} claims now exist for this source.`
+      );
+      setStatus('completed');
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : 'Workspace persistence failed again.';
+
       setResult({
+        ...pending.result,
         success: false,
-        sourceId: source.id,
-        sourceName: source.filename,
-        claims: [],
-        extractedCount: 0,
-        groundedCount: 0,
-        error: message,
+        error: `The extracted claims are retained. Workspace save retry failed: ${message}`,
       });
       setStatusMessage(message);
       setStatus('error');
@@ -313,16 +379,22 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
                   <p className="text-xs text-rose-800 dark:text-rose-300 leading-relaxed">
                     {result?.error || statusMessage || 'Could not complete knowledge extraction from this source.'}
                   </p>
+                  {pendingPersistence && (
+                    <p className="text-xs text-rose-800 dark:text-rose-300 leading-relaxed">
+                      {pendingPersistence.result.extractedCount} extracted claims are retained.
+                      Retry Save will reuse this exact batch without calling Gemini again.
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-rose-200 dark:border-rose-900/60">
                 <button
-                  onClick={handleStartExtraction}
+                  onClick={pendingPersistence ? handleRetryPersistence : handleStartExtraction}
                   className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Retry Extraction</span>
+                  <span>{pendingPersistence ? 'Retry Save' : 'Retry Extraction'}</span>
                 </button>
               </div>
             </div>

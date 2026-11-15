@@ -133,6 +133,33 @@ export async function countWorkspaceSourceClaims(
   return count ?? 0;
 }
 
+
+export async function updateWorkspaceClaimFlag(
+  workspaceId: string,
+  claim: KnowledgeClaim
+) {
+  const ws = requiredWorkspace(workspaceId);
+
+  const { data, error } = await client()
+    .from('claims')
+    .update({
+      is_flagged: claim.isFlagged ?? false,
+      flagged_at: iso(claim.flaggedAt),
+      flag_reason: claim.flagReason ?? null,
+    })
+    .eq('workspace_id', ws)
+    .eq('id', claim.id)
+    .select('id');
+
+  if (error) throw error;
+
+  if (!data?.length) {
+    throw new Error(
+      'Claim was not updated. It may not exist in this workspace or your role may not have permission.'
+    );
+  }
+}
+
 export async function saveWorkspaceConflicts(workspaceId: string, items: ProjectConflict[]) {
   const ws=requiredWorkspace(workspaceId); if(!items.length)return;
   const rows=items.map(x=>({id:x.id,workspace_id:ws,title:x.title,description:x.description,

@@ -97,6 +97,23 @@ BEGIN
     RAISE EXCEPTION 'Activity reference test fixtures are missing';
   END IF;
 
+  -- A claim in this workspace must never reference another workspace's source.
+  BEGIN
+    INSERT INTO public.claims (
+      id,workspace_id,source_id,source_name,source_location,source_evidence_quote,
+      statement,category,confidence_score,confidence_tier
+    ) VALUES (
+      'clm-cross-workspace-source-test',v_workspace,v_foreign_source,
+      'foreign.txt','foreign.txt','Foreign evidence quote',
+      'Cross-workspace source reference must be rejected',
+      'Important Facts',90,'high'
+    );
+
+    RAISE EXCEPTION 'Cross-workspace claim/source reference was accepted';
+  EXCEPTION WHEN SQLSTATE '23503' THEN
+    NULL;
+  END;
+
   INSERT INTO public.sources (id,workspace_id,title,type,filename)
   VALUES ('src-activity-ref-test',v_workspace,'Activity reference test','text','activity-ref.txt');
 

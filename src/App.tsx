@@ -53,7 +53,7 @@ import {
 } from './data/sampleData';
 import { ProjectConflict, MissingInfoFinding, UnresolvedQuestion } from './types';
 import { useWorkspaceSession } from './components/auth/WorkspaceSessionContext';
-import { appendWorkspaceActivity, countWorkspaceSourceClaims, deleteWorkspaceSource, loadWorkspaceData, saveWorkspaceClaims, saveWorkspaceConflicts, saveWorkspaceMissingInfo, saveWorkspaceQuestions, saveWorkspaceSource, subscribeWorkspaceChanges, updateWorkspaceClaim, uploadWorkspaceSourceFile } from './services/workspaceCloud';
+import { appendWorkspaceActivity, countWorkspaceSourceClaims, deleteWorkspaceSource, loadWorkspaceData, saveWorkspaceClaims, saveWorkspaceConflicts, saveWorkspaceMissingInfo, saveWorkspaceQuestions, saveWorkspaceSource, subscribeWorkspaceChanges, updateWorkspaceClaim, updateWorkspaceClaimFlag, uploadWorkspaceSourceFile } from './services/workspaceCloud';
 
 export default function App() {
   const cloud = useWorkspaceSession();
@@ -401,42 +401,65 @@ export default function App() {
     if (!target) return;
 
     const newFlagState = !target.isFlagged;
+
     const updatedClaim: KnowledgeClaim = {
       ...target,
       isFlagged: newFlagState,
       flaggedAt: newFlagState ? new Date().toISOString() : undefined,
-      flaggedBy: newFlagState ? 'Elena Rostova (Lead Architect)' : undefined,
+      flaggedBy: newFlagState ? activeActor : undefined,
     };
 
-    // 1. Immediately update interface state
-    setClaims((prev) => prev.map((c) => (c.id === claimId ? updatedClaim : c)));
+    // Persist first. Never show an unconfirmed flag change.
+    try {
+      if (activeWorkspaceId) {
+        await updateWorkspaceClaimFlag(activeWorkspaceId, updatedClaim);
+      } else {
+        await saveStoredClaims([updatedClaim]);
+      }
+    } catch (err) {
+      console.error(`Failed to persist flag state for claim ${claimId}:`, err);
 
-    // 2. Update inspecting claim if open
+      const message = err instanceof Error
+        ? err.message
+        : 'Please check your connection and try again.';
+
+      alert(
+        `Could not save the flag change. Your original flag state was preserved. ${message}`
+      );
+      return;
+    }
+
+    // Update the interface only after persistence succeeds.
+    setClaims((prev) =>
+      prev.map((claim) => claim.id === claimId ? updatedClaim : claim)
+    );
+
     if (inspectingClaim?.id === claimId) {
       setInspectingClaim(updatedClaim);
     }
 
-    // 3. Persist to IndexedDB so it survives page refresh
-    try {
-      if (activeWorkspaceId) await saveWorkspaceClaims(activeWorkspaceId, [updatedClaim]);
-      else await saveStoredClaims([updatedClaim]);
-    } catch (err) {
-      console.warn('Failed to persist flagged claim:', err);
-    }
-
-    // 4. Record Activity event
+    // Record activity only after successful persistence.
     const newAct: ActivityEvent = {
       id: `act-${Date.now()}`,
       type: newFlagState ? 'claim_flagged' : 'claim_unflagged',
       timestamp: 'Just now',
-      title: newFlagState ? `Claim #${claimId} Flagged for Review` : `Flag Removed from Claim #${claimId}`,
+      title: newFlagState
+        ? `Claim #${claimId} Flagged for Review`
+        : `Flag Removed from Claim #${claimId}`,
       description: updatedClaim.statement,
-      actor: 'Elena Rostova',
+      actor: activeActor,
       claimId,
       sourceId: updatedClaim.sourceId,
     };
+
     setActivity((prev) => [newAct, ...prev]);
-    if (activeWorkspaceId) void appendWorkspaceActivity(activeWorkspaceId, newAct).catch((e) => alert('Activity could not be synchronized: ' + e.message));
+
+    if (activeWorkspaceId) {
+      void appendWorkspaceActivity(activeWorkspaceId, newAct)
+        .catch((e) =>
+          alert('Activity could not be synchronized: ' + e.message)
+        );
+    }
   };
 
   // Handle adding a newly ingested source (from upload or connector)
