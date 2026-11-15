@@ -197,7 +197,7 @@ export async function uploadWorkspaceSourceFile(workspaceId: string, source: Sou
 export function subscribeWorkspaceChanges(workspaceId: string, onChange: () => void, channelSuffix = 'app') {
   const ws = requiredWorkspace(workspaceId);
   const db = client();
-  const tables = ['sources', 'claims', 'conflicts', 'missing_info', 'questions', 'handovers'] as const;
+  const tables = ['sources', 'claims', 'conflicts', 'missing_info', 'questions', 'activity_events', 'handovers'] as const;
 
   // Postgres Changes handles INSERT and UPDATE. DELETE is delivered through
   // a separate private Broadcast channel because filtered DELETE payloads

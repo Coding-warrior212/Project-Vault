@@ -334,3 +334,27 @@ test('creation maps Supabase row-level security rejection to forbidden', async (
     assert.equal(response.status, 403);
   });
 });
+
+test('rejects oversized invite payloads before contacting Supabase', async () => {
+  let calls = 0;
+  const app = express();
+  app.use(createInviteRouter({
+    supabaseUrl: 'https://example.supabase.co',
+    publishableKey: 'sb_publishable_test',
+    secretKey: 'sb_secret_test',
+    fetchImpl: async () => {
+      calls += 1;
+      return new Response('{}', { status: 200 });
+    },
+  }));
+
+  await withServer(app, async (url) => {
+    const response = await fetch(`${url}/api/workspaces/redeem-invite`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer user-session-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: 'PV-AB12-CD34', padding: 'x'.repeat(3000) }),
+    });
+    assert.equal(response.status, 413);
+  });
+  assert.equal(calls, 0);
+});

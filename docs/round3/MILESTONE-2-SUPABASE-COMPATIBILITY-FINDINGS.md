@@ -102,3 +102,26 @@ The current `server.ts` still exposes `POST /api/gemini/extract-knowledge` and `
 The new invite route does not solve this. Before the app is treated as a secure multi-user deployment, add a shared Supabase-authenticated middleware, reject anonymous/demo sessions for live AI operations, derive the actor from the verified Auth response, and enforce the relevant workspace contributor role using a trusted workspace ID. Update the frontend to send the session token and workspace ID. Keep the read-only Judge Demo path away from Gemini calls. Add negative tests for missing/expired/anonymous sessions and non-member/viewer roles.
 
 This is an application integration blocker; it is separate from the database RLS review.
+
+
+## 2026-11-15 review — migration-set and append-only audit follow-up
+
+The hosted Supabase project was rechecked read-only on 2026-11-15:
+- PostgreSQL 17.11.
+- `supabase_realtime` publication exists.
+- No application tables in `public` or `private`; migration history remains empty.
+- Security, Performance and Health Advisors return no lints on the empty schema. This is not a schema security sign-off.
+- `pgrst.db_schemas` is NULL from the read-only setting query; Dashboard Data API exposure configuration remains unknown.
+
+The migration-set review found that the original local runner applied only the first SQL file. The runner now applies all migration files in lexical order. GitHub Actions run [#43681066786](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43681066786) passed the application job and the PostgreSQL 17 job using the full migration set and updated schema assertions.
+
+Migration `20261115120000_preserve_append_only_activity_references.sql` now:
+- drops the source, claim and actor-user `ON DELETE SET NULL` foreign keys that would otherwise try to UPDATE append-only activity rows;
+- preserves those identifiers as immutable historical audit references; and
+- validates newly inserted source/claim references against the event's workspace.
+
+The cloud Realtime subscription now includes `activity_events`, which is loaded by the cloud adapter but was previously omitted from the subscription list.
+
+Commit `47b085b` adds local adversarial checks that valid same-workspace references can be inserted, cross-workspace source/claim references are rejected, and deleting a referenced source/claim does not rewrite the immutable event. These checks passed in GitHub Actions run [#43681406630](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43681406630). The same run includes commit `c7bd137`, which adjusts the invite-route tests to exercise the route's own 2 KB parser and confirms an oversized payload is rejected before any Supabase request.
+
+**Milestone 2 remains OPEN.** The CI PostgreSQL harness is not managed Supabase. PostgREST transaction-bound capability behavior, managed function ownership/grants, Auth, Storage API, Realtime delivery, full role/tenant isolation, and concurrency remain unverified. The hosted database was not modified.

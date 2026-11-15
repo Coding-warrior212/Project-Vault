@@ -1,124 +1,57 @@
 # ProjectVault Round 3 — Milestone Status
 
-**Snapshot:** 2026-11-14 (user-local verification on `375e7f2`; latest PR CI passed both jobs)  
+**Snapshot:** 2026-11-15
 **Repository:** `Coding-warrior212/Project-Vault`  
 **Working branch:** `round3-development`  
-**Target:** preserve `main` and the hosted Supabase project until explicit release approval.
+**Release constraints:** free-only; preserve `main` and the hosted Supabase project until explicit release approval.
 
 ## Executive status
 
-The Round 3 branch contains the 14-table draft schema, RLS/triggers/RPCs, a local PostgreSQL 17 validation harness, a server-side invite redemption boundary, browser authentication UI, and automated CI.
+The development branch has advanced beyond the earlier authentication-only snapshot. It now contains browser Supabase Auth UI, a workspace-scoped cloud data adapter, private Storage upload/download/delete paths, public GitHub documentation snapshots, a derived source-to-claim knowledge graph view, and an isolated browser-local Judge Demo.
 
-The user has now pulled the latest branch head `375e7f232a100094f410e05fe4280dcb20f2be8f` and locally verified:
-- `npm run test:server`: 5/5 tests passed.
-- `npm run lint`: TypeScript check passed with no errors.
-- `npm run build`: production build passed (1,727 modules); the main JS chunk is 973.16 KB and triggers a non-blocking Vite size warning; the PDF worker asset is 1,271.91 KB.
-GitHub Actions PR run [43576454363](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43576454363) also passed both jobs: application tests/typecheck/build and disposable PostgreSQL 17 migration/adversarial smoke tests.
+**No milestone is fully signed off yet.** The hosted Supabase project remains empty and unchanged. The earlier GitHub Actions run [#43620652179](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43620652179) passed, but its database runner applied only migration 1. This review corrected the gap. GitHub Actions run [#43681406630](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43681406630) passed both jobs: server security tests, TypeScript typecheck, production build, and the PostgreSQL 17 harness applying every migration file plus schema assertions and activity-reference smoke tests. The run includes commit `c7bd137`, which adjusts the invite-router tests to exercise the route's own 2 KB body limit and verifies oversized payloads are rejected before any Supabase call.
 
-Milestone 3 is verified at the source/build/unit-test level, but remains in progress until real Supabase Auth, OAuth callbacks, RLS and invite redemption are exercised against a disposable Supabase runtime. The hosted Supabase project remains untouched.
-
-No hosted migration, production data/schema change, deployment, PR merge, or secret modification has been performed.
-
-## Eight milestone tracker
+## Eight-milestone tracker
 
 | # | Milestone | Current status | Verified progress | Remaining blockers / acceptance evidence |
 |---|---|---|---|---|
-| 1 | Development foundation | In progress | Branch head `375e7f2`; user-local server tests (5/5), TypeScript check, and Vite build pass; latest PR CI run `43576454363` passes both app and PostgreSQL 17 jobs; PR #1 remains draft and unmerged. | Review branch scope and address the non-blocking large JS chunk warning; complete final branch review. |
-| 2 | Supabase foundation | Open — not signed off | 14-table migration and RLS/security assertions are drafted. PostgreSQL 17 local migration/adversarial smoke harness passed; invite route tests passed 5/5. Hosted project remains at zero migrations and is unchanged. Empty-schema Security/Performance/Health Advisors report no findings. | Verify managed Supabase roles, RPC ownership/grants, PostgREST transaction capabilities, Storage, Auth and Realtime on an approved disposable environment. Review advisors again after schema exists. Define file replacement semantics. |
-| 3 | Authentication and RBAC | In progress — locally verified; live integration pending | Email/password registration/sign-in, Google OAuth initiation, password reset/update, session restoration, sign-out, authenticated invite redemption and RLS-backed membership portal are implemented. User-local tests 5/5, TypeScript and build pass on `375e7f2`; latest PR CI passes app and DB jobs. | Verify real Auth provider configuration and email/OAuth callbacks on a disposable Supabase stack; exercise invite redemption against real Auth/PostgREST; role-aware operations follow with cloud adapter. No hosted migration applied. |
-| 4 | Cloud persistence and realtime | Not started | Local IndexedDB/localStorage remains available; draft cloud schema exists. | Implement Supabase data adapter and Storage upload/download/delete, idempotent local-to-cloud importer with orphan filtering and row-count verification, Realtime subscriptions, and preserve existing local data until verified. |
-| 5 | Three promised improvements | Not complete | Draft tables include workspace collaboration and graph nodes/edges. | Connect shared workspaces to live app state; implement user-authorized GitHub repository sync; implement graph construction and evidence-linked change-impact/staleness propagation. |
-| 6 | Judge Demo | Partial design only | Migration includes a seeded Apex demo workspace and policies intended to keep it read-only. | App still boots from local sample data; wire a one-click read-only demo path, prove no private-workspace visibility or mutation, and block Gemini/quota-consuming operations for demo visitors. |
-| 7 | Security and end-to-end testing | Open | Local schema assertions and adversarial smoke harness exist. Invite endpoint unit/integration tests are committed. | Execute tests; test anon/authenticated/service_role, all five roles, cross-workspace isolation, invite expiry/revocation/replay/concurrency, owner safety, Storage and Realtime. Add protected Gemini route tests. |
-| 8 | Final deployment and submission | Not ready | Existing app and repository links are recorded in project context. | Only after gates pass: controlled deployment, production migration approval, end-to-end smoke test, updated project PDF, improvements list, technical details, testing notes and team contributions. |
+| 1 | Development foundation | In progress | `round3-development` exists and compares as ahead of `main` and 0 behind. Latest confirmed branch CI run #43681406630 passed both jobs. PR #1 is confirmed open, draft and unmerged, with 43 changed files in the current PR snapshot. The PR description was refreshed with the latest verification evidence and remaining gates. | Complete a full branch review, confirm the current PR head/status, review CI on the latest commit, and resolve the non-blocking large production-bundle warning. |
+| 2 | Supabase foundation | **Open — not signed off** | Draft 14-table schema, RLS, policies, triggers, RPCs, private Storage bucket, demo seed and assertions exist. Run #43681406630 passed the local PostgreSQL 17 harness after it was changed to apply all migrations in lexical order, including the append-only activity-reference smoke checks. Migration 2 now removes all three append-only-incompatible `ON DELETE SET NULL` references (source, claim and Auth user) and validates new source/claim references at insert time. Read-only hosted checks show PostgreSQL 17.11, `supabase_realtime` publication present, zero app tables, zero migration records and no advisor lints on the empty schema. | Managed Supabase roles/function ownership, PostgREST transaction-bound capability behavior, RLS/API role tests, Storage, Auth, Realtime, concurrency, and advisors after schema installation remain unverified. The hosted project must remain unchanged. The hosted managed-Supabase gates remain open. Latest smoke-test additions for cross-workspace activity references and immutable historical references are committed but await a confirmed CI result. |
+| 3 | Authentication and RBAC | In progress — implementation present, managed runtime pending | Browser client uses publishable key only. AuthGate includes email/password sign-up/sign-in, Google OAuth initiation, password recovery/update, session restoration, sign-out, workspace membership lookup, workspace creation RPC and invite redemption. Server invite route validates the session through Supabase Auth and derives the user ID from the Auth response. | Verify real email confirmation/reset delivery, Google provider and callback configuration, invite redemption against managed Auth/PostgREST, all five roles and outsider isolation. Do not put the secret key in browser variables. |
+| 4 | Cloud persistence and Realtime | Partially implemented; end-to-end sign-off pending | `workspaceCloud.ts` loads/saves sources, claims, conflicts, missing-info findings, questions and activity events; it has private-bucket file operations, signed downloads, handover persistence and Realtime subscriptions. App selects cloud persistence only inside an authenticated workspace. | Full local-Supabase E2E is still required. A verified local-to-cloud importer with orphan filtering, row-count verification and a non-destructive preservation check is not present in the reviewed code. Realtime now subscribes to `activity_events` as well as the other workspace tables; build/typecheck passed in run #43681066786. |
+| 5 | Three promised improvements | Partial | Shared workspace access/invite foundation exists. Public GitHub repositories can be snapshotted and manually synced to a pinned commit. The Knowledge Graph page shows source-to-claim evidence links and related review state. | GitHub private-repo OAuth/background sync is absent. The graph is a derived evidence view, not persisted graph-node/edge construction or automatic dependency/change-impact/staleness propagation. Complete and test the promised depth or explicitly scope the submission claims. |
+| 6 | Judge Demo | Partial — acceptance mismatch | The demo uses a separate browser-local IndexedDB database and localStorage namespace; reset is scoped to that demo namespace. Prior user-confirmed browser checks cover entering, supported review/handover interactions, refresh persistence and reset. Gemini endpoints remain fail-closed. | Current implementation is explicitly **interactive**, not read-only. The earlier agreed acceptance described a read-only Judge Demo. Align the behavior before release; also verify that pre-existing default-scope browser records remain unchanged when entering/exiting/resetting the demo. |
+| 7 | Security and end-to-end testing | Open | GitHub Actions run #43681406630 passed the server security tests, typecheck, build and the full local PostgreSQL migration/assertion/smoke harness, including the oversized invite-body test. Gemini endpoints currently return 503 until workspace authorization exists, preventing unauthenticated quota use. | Run the full test matrix against a local Supabase stack: anon/authenticated/service_role, owner/admin/editor/reviewer/viewer, cross-workspace isolation, invite expiry/revocation/replay/concurrency, last-owner races, Storage and Realtime. Add protected Gemini route tests before re-enabling AI. Re-run database CI after the migration-runner correction. |
+| 8 | Final deployment and submission | Not ready | Existing app and repository links are known. No deployment or production migration was performed. | Only after gates pass: separately approved production migration/deployment, end-to-end smoke test, updated project PDF, improvements list, technical details, testing notes and verified individual team contributions. |
 
-## New branch work in this snapshot
+## Current hosted Supabase baseline — read-only
 
-- `.github/workflows/round3-verification.yml` (commit `eacbf15`): runs Node 22 locked install, invite server tests, TypeScript lint, Vite production build, and the disposable PostgreSQL 17 migration/assertion/adversarial smoke harness. GitHub Actions run `43573429135` completed successfully; both jobs and all listed steps passed.
+Project `asjxqshuvepjsqzttafc`:
+- PostgreSQL version: **17.11**.
+- `supabase_realtime` publication: present.
+- Application base tables in `public` and `private`: **0**.
+- Migration history rows: **0**.
+- `pgrst.db_schemas`: NULL from the read-only setting query; this does not prove the Dashboard's exposed-schema configuration.
+- Security, Performance and Health Advisor responses: no lints on the empty schema; these are not a security sign-off for the proposed schema.
 
-- `server/supabaseInvite.ts`: dedicated small-body invite route; Supabase Auth user validation; explicit non-anonymous check; SHA-256 invite hash; service-only RPC call using the secret key on the `apikey` header; bounded per-IP in-memory limiter; request timeouts; sanitized errors.
-- `server/supabaseInvite.test.ts`: code normalization/hash, authenticated identity derivation, no secret Bearer header, anonymous-user rejection and missing-session tests.
-- `server.ts`: mounts the invite router before the large-document JSON parser and trusts the single Render proxy hop for client-IP rate limiting.
-- `package.json`: adds `npm run test:server`.
-- Migration RPC: fixes retry idempotency at the final invite-use boundary; local SQL smoke test now checks that a repeated redemption by the same user returns the existing membership and does not increment the counter twice.
-- `.env.example`: documents `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and server-only `SUPABASE_SECRET_KEY`.
+No schema, data, Auth provider, Storage, secret, or deployment settings were changed.
 
-The invite endpoint behavior is locally verified by the 5-test suite. The production route is not yet wired to a sign-in/invite UI or validated against a real Supabase Auth/PostgREST environment.
+## Findings and changes from this review
 
-## Latest local checkout confirmation
+1. **Migration runner coverage gap fixed:** `scripts/validate-db-local.sh` now applies every `supabase/migrations/*.sql` file in lexical order. Run #43681066786 passed the full migration set and updated schema assertions.
+2. **Append-only audit integrity hardened:** migration 2 now drops source, claim and actor-user `ON DELETE SET NULL` foreign keys, and validates new source/claim references against the same workspace at INSERT time. The schema assertions passed in run #43681066786. The cross-workspace/source-deletion smoke tests and the oversized invite-body test passed in CI run #43681406630.
+3. **Realtime completeness fixed:** `subscribeWorkspaceChanges` now subscribes to `activity_events`, matching `loadWorkspaceData`.
+4. **Storage semantics:** the bucket is private, uploads use unique object paths with `upsert: false`, and the SQL UPDATE policy remains denied. Same-key replacement is intentionally unsupported until a narrowly scoped update policy and test are designed.
+5. **AI availability:** extraction and conflict-analysis endpoints remain fail-closed with HTTP 503 until verified session, workspace, source and role authorization is implemented. This is a deliberate security mitigation, not a completed AI workflow.
 
-The user pulled `origin/round3-development` successfully from `7426dc4` to `2734c4d` using a fast-forward update. No conflicts were reported. The user's earlier local verification passed server tests 5/5, lint, production build, and the local PostgreSQL 17 migration/smoke harness. On `4897a27`, tests still passed but lint failed with 14 errors; commit `b8f43be` removes the unreachable legacy Gemini implementation. Re-run server tests, lint, build and local PostgreSQL harness after pulling that commit. This is local-only validation; do not connect the test command to the hosted Supabase project.
+## Exact user actions
 
-No Supabase secrets are needed for these local tests. Do not add a real secret key to Git, `.env.example`, Vite-prefixed variables, or the browser bundle.
+**Nothing is required from the user today.** Continue using the existing free local tooling. Do not create a paid Supabase branch or apply the draft migrations to the hosted project. When a real Auth/provider or local browser validation step becomes necessary, provide the exact dashboard clicks/commands and request only the required user-side action.
 
-## Security gates that remain explicit
+## Release rules
 
-- The Gemini extraction/conflict endpoints in `server.ts` have now been changed to fail closed with HTTP 503 until verified sessions and workspace authorization are integrated; the status endpoint no longer discloses whether a provider secret is configured. This deliberately disables AI extraction/conflict analysis in the current unauthenticated client rather than expose Gemini quota. It is an interim mitigation, not the completed authorization implementation; add protected, workspace-scoped routes and negative tests before re-enabling AI. The app also has no Supabase Auth UI or cloud persistence adapter, so the SQL migration is not yet an integrated production application. Do not present the current hosted app as a secure multi-tenant deployment until session verification, workspace contributor authorization, frontend session wiring, and negative tests are complete.
-- Storage UPDATE is deliberately denied. Same-key upsert/replacement is unsupported until a constrained update policy is designed and tested; keep the current fail-closed policy meanwhile.
-- The local PostgreSQL stubs do not prove Supabase-managed Auth, PostgREST, Storage, Realtime, key handling, or role behavior.
-- The hosted project must remain unchanged until the disposable-environment gates pass and a separate explicit production approval is given.
-
-## Free-only and release constraints
-
-Use only zero-cost local tooling and existing free allowances. Do not introduce paid infrastructure, apply migrations to production, alter live data/schema, deploy, merge PRs, or change secrets without explicit approval.
-
-
-## Latest security hardening (commit `5071eec`)
-
-- Removed the provider-secret presence disclosure from `GET /api/gemini/status`; it now reports the AI capability as unavailable without exposing secret configuration.
-- Changed both Gemini POST endpoints to fail closed with a clear `WORKSPACE_AUTHORIZATION_REQUIRED` response until the application has authenticated sessions and server-verified workspace membership.
-- This is intentionally a temporary availability trade-off: current frontend calls do not carry authenticated session/workspace context. Do not re-enable these endpoints merely by adding a bearer-header presence check; verify the token with Supabase Auth and authorize the requested workspace/source server-side first.
-- Latest security commit still requires CI and local WSL verification. No production resources were touched.
-
-
-## Follow-up cleanup (commit `b8f43be`)
-
-- Removed the unreachable legacy Gemini extraction and conflict-analysis implementations and their unused SDK/schema/helper code. This resolves the source of the TypeScript errors without weakening the fail-closed behavior.
-- Both Gemini POST endpoints still return HTTP 503 with `WORKSPACE_AUTHORIZATION_REQUIRED`; no Gemini calls or quota use can occur through these routes until verified session and workspace authorization are implemented.
-- The user's verification of `4897a27` reported 14 TypeScript errors in the unreachable legacy code. Server invite tests passed 5/5 and Vite build completed. Pull and re-run checks on `b8f43be`; no local pass is claimed yet.
-
-
-## Judge-facing AI availability disclosure (commit `bdc60e6`)
-
-- Updated the reconstruction modal to clearly state that AI reconstruction is temporarily unavailable until authenticated workspace authorization is implemented. The extraction action is visibly disabled rather than inviting users to submit documents to a route that correctly fails closed.
-- Existing knowledge review remains available. This is a user-experience honesty improvement, not completion of the AI/authentication milestone. Commit `bdc60e6` awaits local and CI verification.
-
-## Milestone 3 implementation update (2026-11-14)
-
-The branch now contains the first integrated browser authentication and workspace-access gate:
-
-- `src/lib/supabase.ts` creates a browser Supabase client only when `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are configured. HTTPS is required except for localhost HTTP development URLs. The browser client never imports or exposes the server secret key.
-- `src/components/auth/AuthGate.tsx` restores persisted sessions, subscribes to Auth state changes, supports email/password sign-in and registration, Google OAuth, password reset, and sign-out.
-- The authenticated workspace portal queries `workspace_members` filtered to the current Auth user, then retrieves only those workspace records. Database RLS remains the actual authorization boundary; client-side filtering is not treated as security.
-- The portal redeems invitation codes through the existing `/api/workspaces/redeem-invite` endpoint using the current access token. The server validates the token with Supabase Auth and derives the user ID itself.
-- `src/main.tsx` mounts the gate. If browser Supabase configuration is absent, the existing sample UI remains available with a visible local-demo-mode banner; no private workspace is loaded in this fallback.
-- `.env.example` now documents the two browser-safe `VITE_` variables separately from server-only `SUPABASE_SECRET_KEY`.
-
-**Important scope boundary:** Once Auth is configured, the authenticated portal intentionally does not mount the old sample-data application for private workspaces. The existing project screens still use local demo state and must not be mistaken for a cloud-backed private workspace. The portal reports verified membership and role only; loading private records belongs to Milestone 4.
-
-**Verification:** GitHub Actions application job for commit `5fdc270` passed server tests, TypeScript typecheck and Vite production build. The pull-request PostgreSQL job failed while starting the disposable Docker-based validation container (after pulling `postgres:17-alpine`); the failure occurred before migration output and is not evidence of a SQL assertion failure. The earlier user-run local PostgreSQL 17 migration/adversarial harness remains the latest successful database validation. Re-run the database workflow before signing off this milestone. The push-triggered workflow run is pending at this snapshot.
-
-**Not yet verified:** live Supabase Auth provider configuration, Google OAuth callback configuration, email confirmation/reset delivery, PostgREST RLS behavior on the managed project, actual invitation redemption against managed Auth/PostgREST, and the full sign-up → invite → workspace membership flow. No production migration or secret change was made.
-
-
-
-## Milestone 3 verification follow-up (2026-11-14, commit `65aa8ea`)
-
-- Added password-recovery callback handling and an authenticated password-update form.
-- Hardened browser configuration detection to reject placeholder values and permit HTTP only for localhost Supabase development; deployed Supabase URLs must use HTTPS.
-- GitHub Actions PR run `43576399121` passed both jobs: server tests, TypeScript typecheck, Vite production build, and local PostgreSQL 17 migration/adversarial smoke tests.
-- The browser client uses only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. The service/secret key remains server-only. Supabase Auth persists and refreshes sessions using the SDK; authorization of workspace rows is still enforced by database RLS.
-- The authenticated portal intentionally stops at verified workspace membership metadata. It does not claim that private workspace source/claim records are cloud-loaded. That integration is Milestone 4.
-- Live Auth provider configuration, email delivery, Google OAuth callback, actual managed Supabase RLS, and real invite redemption remain unverified. The hosted Supabase project has not been changed. Do not mark Milestone 3 complete until disposable Supabase runtime tests pass.
-
-
-## Latest user verification — 2026-11-14
-
-The user pulled `origin/round3-development` from `0cdc317` to `375e7f2` with a clean fast-forward update, then ran the following successfully from WSL:
-- `npm run test:server`: 5 passed, 0 failed.
-- `npm run lint`: `tsc --noEmit` passed.
-- `npm run build`: Vite production build passed (1,727 modules). Non-blocking warnings: main JS chunk 973.16 KB exceeds 500 KB; PDF worker asset is 1,271.91 KB.
-
-GitHub Actions PR run `43576454363` for the same branch head completed successfully. Both jobs passed, including the PostgreSQL 17 migration and adversarial smoke harness.
-
-PR #1 remains open, draft and unmerged. The branch is 76 commits ahead of `main`, with no commits behind. Keep `main`, the hosted Supabase project, deployment settings and secrets unchanged. Next integration gate is a disposable local Supabase CLI stack (Auth + PostgREST + Storage + Realtime), not the hosted project.
+- Never apply these migrations to the hosted project without a separate explicit production approval.
+- Never deploy, merge PR #1, change secrets, or modify live schema/data in this workflow.
+- Keep the service/secret key server-only; never use a `VITE_` prefix for it.
+- Do not mark Milestone 2 complete based on PostgreSQL stubs or empty-schema advisors.
+- Do not claim the Judge Demo is read-only while it still permits isolated local edits.

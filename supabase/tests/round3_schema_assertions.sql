@@ -75,6 +75,22 @@ BEGIN
   LIMIT 1;
   IF v_bad IS NOT NULL THEN RAISE EXCEPTION 'SECURITY DEFINER function % has no fixed search_path',v_bad; END IF;
 
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid='public.activity_events'::regclass
+      AND conname IN ('fk_activity_source','fk_activity_claim','activity_events_actor_user_id_fkey')
+  ) THEN
+    RAISE EXCEPTION 'Append-only activity references must not use ON DELETE SET NULL foreign keys';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger t
+    JOIN pg_class c ON c.oid=t.tgrelid
+    JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname='public' AND c.relname='activity_events'
+      AND t.tgname='trg_activity_events_validate_references' AND NOT t.tgisinternal
+  ) THEN RAISE EXCEPTION 'Activity-event same-workspace reference validation trigger is missing'; END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM pg_trigger t
     JOIN pg_class c ON c.oid=t.tgrelid
