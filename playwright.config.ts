@@ -25,6 +25,12 @@ export default defineConfig({
 
   webServer: {
     command: 'npm run dev',
+    // Give E2E a deliberately non-production Supabase config so AuthGate exposes
+    // the interactive demo entry point without connecting to a real project.
+    env: {
+      VITE_SUPABASE_URL: 'https://projectvault-e2e.invalid',
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'e2e-only-publishable-key',
+    },
     url: 'http://127.0.0.1:3000/health',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
