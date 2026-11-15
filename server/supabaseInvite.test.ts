@@ -214,6 +214,43 @@ test('creation generates a one-time code and inserts only its hash using the use
   assert.equal('created_by' in body, false);
 });
 
+test('invite creation is rate limited per authenticated user', async () => {
+  let insertCalls = 0;
+  const app = express();
+  app.use(createInviteRouter({
+    supabaseUrl: 'https://example.supabase.co',
+    publishableKey: 'sb_publishable_test',
+    maxCreateAttempts: 1,
+    fetchImpl: async (input) => {
+      if (String(input).endsWith('/auth/v1/user')) {
+        return new Response(JSON.stringify({ id: USER_ID, is_anonymous: false }), { status: 200 });
+      }
+      insertCalls += 1;
+      return new Response(null, { status: 201 });
+    },
+  }));
+
+  await withServer(app, async (url) => {
+    const makeRequest = () => fetch(`${url}/api/workspaces/create-invite`, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer user-session-token',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ workspaceId: 'ws-real', role: 'editor' }),
+    });
+
+    const first = await makeRequest();
+    assert.equal(first.status, 201);
+
+    const second = await makeRequest();
+    assert.equal(second.status, 429);
+    assert.ok(Number(second.headers.get('retry-after')) > 0);
+  });
+
+  assert.equal(insertCalls, 1);
+});
+
 test('creation rejects requests without a bearer session', async () => {
   let calls = 0;
 
