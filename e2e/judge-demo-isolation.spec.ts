@@ -6,7 +6,7 @@ async function seedDefaultWorkspaceStorage(page: Page) {
     localStorage.setItem('projectvault_claims', JSON.stringify(defaultClaims));
     localStorage.setItem('projectvault_review_conflicts', JSON.stringify([
       { id: 'default-conflict-marker', title: 'Preserve this default conflict' },
-    ])]);
+    ]));
 
     const request = indexedDB.open('ProjectVault_DB', 2);
     request.onupgradeneeded = () => {
