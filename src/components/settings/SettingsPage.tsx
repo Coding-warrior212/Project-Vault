@@ -198,11 +198,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 PostgreSQL & Supabase Persistence
               </div>
               <div className="text-neutral-500 dark:text-[#8E8DAF] text-[11px]">
-                Supabase Auth, workspace-scoped PostgreSQL persistence, and Storage are connected. Realtime subscription behavior still needs end-to-end verification.
+                Supabase Auth, workspace-scoped PostgreSQL persistence, and Storage are connected. Workspace live updates have been verified across two sessions, including reconnect and membership-scoped private DELETE notifications.
               </div>
             </div>
             <span className="text-[10px] font-mono font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800/40">
-              Connected · Realtime QA pending
+              Connected · Live updates verified
             </span>
           </div>
 

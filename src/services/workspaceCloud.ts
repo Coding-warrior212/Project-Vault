@@ -175,16 +175,36 @@ export async function uploadWorkspaceSourceFile(workspaceId: string, source: Sou
   return path;
 }
 export function subscribeWorkspaceChanges(workspaceId: string, onChange: () => void, channelSuffix = 'app') {
-  const ws=requiredWorkspace(workspaceId);
-  const channel=client().channel('pv-workspace-'+ws+'-'+channelSuffix)
-    .on('postgres_changes',{event:'*',schema:'public',table:'sources',filter:'workspace_id=eq.'+ws},onChange)
-    .on('postgres_changes',{event:'*',schema:'public',table:'claims',filter:'workspace_id=eq.'+ws},onChange)
-    .on('postgres_changes',{event:'*',schema:'public',table:'conflicts',filter:'workspace_id=eq.'+ws},onChange)
-    .on('postgres_changes',{event:'*',schema:'public',table:'missing_info',filter:'workspace_id=eq.'+ws},onChange)
-    .on('postgres_changes',{event:'*',schema:'public',table:'questions',filter:'workspace_id=eq.'+ws},onChange)
-    .on('postgres_changes',{event:'*',schema:'public',table:'handovers',filter:'workspace_id=eq.'+ws},onChange);
-  channel.subscribe();
-  return () => { void client().removeChannel(channel); };
+  const ws = requiredWorkspace(workspaceId);
+  const db = client();
+  const tables = ['sources', 'claims', 'conflicts', 'missing_info', 'questions', 'handovers'] as const;
+
+  // Postgres Changes handles INSERT and UPDATE. DELETE is delivered through
+  // a separate private Broadcast channel because filtered DELETE payloads
+  // are not reliable with REPLICA IDENTITY DEFAULT.
+  const postgresChannel = db.channel('pv-workspace-' + ws + '-' + channelSuffix);
+
+  for (const table of tables) {
+    for (const event of ['INSERT', 'UPDATE'] as const) {
+      postgresChannel.on(
+        'postgres_changes',
+        { event, schema: 'public', table, filter: 'workspace_id=eq.' + ws },
+        onChange
+      );
+    }
+  }
+
+  const deleteChannel = db
+    .channel('pv-workspace:' + ws + ':' + channelSuffix, { config: { private: true } })
+    .on('broadcast', { event: 'workspace_delete' }, onChange);
+
+  postgresChannel.subscribe();
+  deleteChannel.subscribe();
+
+  return () => {
+    void db.removeChannel(postgresChannel);
+    void db.removeChannel(deleteChannel);
+  };
 }
 
 export type WorkspaceHandover = {
