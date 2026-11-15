@@ -182,6 +182,7 @@ export function subscribeWorkspaceChanges(workspaceId: string, onChange: () => v
     .on('postgres_changes',{event:'*',schema:'public',table:'conflicts',filter:'workspace_id=eq.'+ws},onChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'missing_info',filter:'workspace_id=eq.'+ws},onChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'questions',filter:'workspace_id=eq.'+ws},onChange)
+    .on('postgres_changes',{event:'*',schema:'public',table:'activity_events',filter:'workspace_id=eq.'+ws},onChange)
     .on('postgres_changes',{event:'*',schema:'public',table:'handovers',filter:'workspace_id=eq.'+ws},onChange);
   channel.subscribe();
   return () => { void client().removeChannel(channel); };
