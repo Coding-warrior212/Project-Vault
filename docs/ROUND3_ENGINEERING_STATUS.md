@@ -94,3 +94,12 @@ Do not infer individual contributions. Confirm each member's actual work before 
 - Commit `47b085b` adds negative local smoke checks for cross-workspace activity references and preservation of audit references after source/claim deletion. A CI result for this latest smoke-test commit is not yet confirmed.
 - Milestone 2 remains open because managed Supabase/PostgREST/Auth/Storage/Realtime behavior and the complete role/concurrency matrix are not verified. The Judge Demo remains interactive and local-only, not strictly read-only as originally agreed. Gemini endpoints remain fail-closed until secure workspace authorization is implemented.
 - No deployment, PR merge, production migration, secret modification, or paid infrastructure was used.
+
+
+### CI follow-up — 2026-11-15
+
+GitHub Actions run [#43681275981](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43681275981) completed successfully:
+- Server tests, TypeScript typecheck and production build: pass.
+- PostgreSQL 17 job: pass after applying every migration file, including the append-only activity-reference migration, running the updated schema assertions, and executing the cross-workspace reference/source-deletion smoke checks.
+
+A later test-only commit `c7bd137` removes a global JSON parser from the invite-router test setup so the route's own 2 KB limit is tested, and adds an oversized-body 413 test. That newest test change does not yet have a confirmed CI result. The application route itself is mounted before the global 35 MB parser in `server.ts`.
