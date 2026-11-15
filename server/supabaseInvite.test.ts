@@ -46,7 +46,6 @@ test('redemption derives the user ID from Supabase Auth and sends the secret onl
   };
 
   const app = express();
-  app.use(express.json());
   app.use(createInviteRouter({
     supabaseUrl: 'https://example.supabase.co',
     publishableKey: 'sb_publishable_test',
@@ -83,7 +82,6 @@ test('redemption derives the user ID from Supabase Auth and sends the secret onl
 test('redemption rejects anonymous Supabase users', async () => {
   let rpcCalls = 0;
   const app = express();
-  app.use(express.json());
   app.use(createInviteRouter({
     supabaseUrl: 'https://example.supabase.co',
     publishableKey: 'sb_publishable_test',
@@ -111,7 +109,6 @@ test('redemption rejects anonymous Supabase users', async () => {
 test('redemption rejects requests without a bearer session before calling Supabase', async () => {
   let calls = 0;
   const app = express();
-  app.use(express.json());
   app.use(createInviteRouter({
     supabaseUrl: 'https://example.supabase.co',
     publishableKey: 'sb_publishable_test',
@@ -129,6 +126,29 @@ test('redemption rejects requests without a bearer session before calling Supaba
       body: JSON.stringify({ code: 'PV-AB12-CD34' }),
     });
     assert.equal(response.status, 401);
+  });
+  assert.equal(calls, 0);
+});
+test('rejects oversized invite payloads before contacting Supabase', async () => {
+  let calls = 0;
+  const app = express();
+  app.use(createInviteRouter({
+    supabaseUrl: 'https://example.supabase.co',
+    publishableKey: 'sb_publishable_test',
+    secretKey: 'sb_secret_test',
+    fetchImpl: async () => {
+      calls += 1;
+      return new Response('{}', { status: 200 });
+    },
+  }));
+
+  await withServer(app, async (url) => {
+    const response = await fetch(`${url}/api/workspaces/redeem-invite`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer user-session-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: 'PV-AB12-CD34', padding: 'x'.repeat(3000) }),
+    });
+    assert.equal(response.status, 413);
   });
   assert.equal(calls, 0);
 });
