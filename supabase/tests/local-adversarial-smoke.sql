@@ -79,6 +79,83 @@ END;
 $$;
 RESET ROLE;
 
+-- Verify activity references are same-workspace at INSERT time and remain
+-- immutable historical identifiers after the referenced source/claim are deleted.
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
+DO $$
+DECLARE
+  v_workspace text;
+  v_foreign_source text;
+  v_foreign_claim text;
+BEGIN
+  SELECT id INTO v_workspace FROM public.workspaces WHERE code='INVREPLAY';
+  SELECT id INTO v_foreign_source FROM public.sources WHERE workspace_id='ws-apex' LIMIT 1;
+  SELECT id INTO v_foreign_claim FROM public.claims WHERE workspace_id='ws-apex' LIMIT 1;
+
+  IF v_workspace IS NULL OR v_foreign_source IS NULL OR v_foreign_claim IS NULL THEN
+    RAISE EXCEPTION 'Activity reference test fixtures are missing';
+  END IF;
+
+  INSERT INTO public.sources (id,workspace_id,title,type,filename)
+  VALUES ('src-activity-ref-test',v_workspace,'Activity reference test','text','activity-ref.txt');
+
+  INSERT INTO public.claims (
+    id,workspace_id,source_id,source_name,source_location,source_evidence_quote,
+    statement,category,confidence_score,confidence_tier
+  ) VALUES (
+    'clm-activity-ref-test',v_workspace,'src-activity-ref-test','activity-ref.txt',
+    'activity-ref.txt','Evidence quote','A test claim for append-only activity references',
+    'Important Facts',90,'high'
+  );
+
+  INSERT INTO public.activity_events (
+    id,workspace_id,type,timestamp_label,title,description,actor,actor_source,source_id,claim_id
+  ) VALUES (
+    'act-activity-ref-valid',v_workspace,'source_ingested','Just now','Reference test',
+    'Valid same-workspace activity reference','Untrusted display name','jwt',
+    'src-activity-ref-test','clm-activity-ref-test'
+  );
+
+  BEGIN
+    INSERT INTO public.activity_events (
+      id,workspace_id,type,timestamp_label,title,description,actor,actor_source,source_id
+    ) VALUES (
+      'act-activity-ref-cross-source',v_workspace,'source_ingested','Just now','Invalid reference',
+      'Cross-workspace source reference','Untrusted display name','jwt',v_foreign_source
+    );
+    RAISE EXCEPTION 'Cross-workspace source reference was accepted';
+  EXCEPTION WHEN SQLSTATE '23503' THEN
+    NULL;
+  END;
+
+  BEGIN
+    INSERT INTO public.activity_events (
+      id,workspace_id,type,timestamp_label,title,description,actor,actor_source,claim_id
+    ) VALUES (
+      'act-activity-ref-cross-claim',v_workspace,'claim_verified','Just now','Invalid reference',
+      'Cross-workspace claim reference','Untrusted display name','jwt',v_foreign_claim
+    );
+    RAISE EXCEPTION 'Cross-workspace claim reference was accepted';
+  EXCEPTION WHEN SQLSTATE '23503' THEN
+    NULL;
+  END;
+
+  DELETE FROM public.sources
+  WHERE workspace_id=v_workspace AND id='src-activity-ref-test';
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.activity_events
+    WHERE id='act-activity-ref-valid'
+      AND source_id='src-activity-ref-test'
+      AND claim_id='clm-activity-ref-test'
+  ) THEN
+    RAISE EXCEPTION 'Deleting a source/claim rewrote the append-only activity reference';
+  END IF;
+END;
+$$;
+RESET ROLE;
+
 -- Verify a caller-settable GUC does not unlock demo writes, even for service_role.
 SET ROLE service_role;
 SELECT set_config('projectvault.seed_mode','on',false);
