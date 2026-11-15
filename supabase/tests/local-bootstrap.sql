@@ -63,3 +63,48 @@ GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION storage.foldername(text) TO anon, authenticated, service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated, service_role;
 GRANT SELECT ON storage.buckets TO anon, authenticated, service_role;
+
+-- Minimal Realtime stand-ins for disposable PostgreSQL migration tests.
+-- These do NOT implement or validate the Supabase Realtime service.
+
+CREATE SCHEMA IF NOT EXISTS realtime;
+
+CREATE TABLE IF NOT EXISTS realtime.messages (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  topic text NOT NULL,
+  extension text NOT NULL DEFAULT '',
+  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  event text NOT NULL DEFAULT '',
+  private boolean NOT NULL DEFAULT true,
+  inserted_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION realtime.topic()
+RETURNS text
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT NULLIF(current_setting('realtime.topic', true), '');
+$$;
+
+CREATE OR REPLACE FUNCTION realtime.send(
+  payload jsonb,
+  event text,
+  topic text,
+  private boolean DEFAULT true
+)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- Intentionally a no-op: this harness validates migration structure,
+  -- not actual Realtime message delivery.
+  RETURN;
+END;
+$$;
+
+GRANT USAGE ON SCHEMA realtime TO authenticated;
+GRANT SELECT ON realtime.messages TO authenticated;
+GRANT EXECUTE ON FUNCTION realtime.topic() TO authenticated;
