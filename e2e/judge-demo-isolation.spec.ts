@@ -91,6 +91,12 @@ test('interactive Judge Demo keeps default workspace storage intact through entr
   await enterDemo.click();
   await expect(page.getByRole('status')).toContainText('INTERACTIVE JUDGE DEMO');
 
+  const reviewNav = page.getByRole('navigation').getByRole('button', { name: /Review/i });
+  await reviewNav.click();
+  await page.getByRole('button', { name: /Claim Verification Queue/i }).click();
+  await page.getByRole('button', { name: /Verify & Approve Claim/i }).click();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('projectvault_judge_demo_claims'))).not.toBeNull();
+
   const sourcesNav = page.getByRole('navigation').getByRole('button', { name: /Sources/i });
   await sourcesNav.click();
 
