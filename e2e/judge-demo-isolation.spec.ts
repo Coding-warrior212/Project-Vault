@@ -75,7 +75,7 @@ async function readDefaultStorage(page: Page) {
 test('interactive Judge Demo keeps default workspace storage intact through entry, edits, exit, and reset', async ({ page }) => {
   const supabaseWriteRequests: string[] = [];
   page.on('request', (request) => {
-    if (/\.supabase\.co$/i.test(new URL(request.url()).hostname)
+    if (/(\.supabase\.co|\.invalid)$/i.test(new URL(request.url()).hostname)
       && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method())) {
       supabaseWriteRequests.push(request.method() + ' ' + request.url());
     }
