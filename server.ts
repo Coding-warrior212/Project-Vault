@@ -26,9 +26,11 @@ dotenv.config({ path: '.env' });
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
-// Render terminates TLS at one trusted proxy hop; this preserves the originating client IP for rate limits.
-app.set('trust proxy', 1);
 const PORT = Number(process.env.PORT) || 3000;
+
+app.get("/health", (_req: Request, res: Response) => {
+  res.status(200).json({ status: "ok" });
+});
 
 // Keep the invite endpoint's small, dedicated JSON limit separate from document uploads.
 app.use(createInviteRouter());

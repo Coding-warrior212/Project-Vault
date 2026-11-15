@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import express, { type Request, type Response } from 'express';
+import { isIP } from 'node:net';
 
 type FetchLike = typeof fetch;
 
@@ -21,6 +22,7 @@ interface InviteRouterOptions {
   maxAttempts?: number;
   maxCreateAttempts?: number;
   windowMs?: number;
+  trustCloudflareIpHeader?: boolean;
 }
 
 interface AttemptWindow {
@@ -37,6 +39,8 @@ export function createInviteRouter(options: InviteRouterOptions = {}) {
   const maxAttempts = options.maxAttempts ?? 8;
   const maxCreateAttempts = options.maxCreateAttempts ?? 5;
   const windowMs = options.windowMs ?? 15 * 60 * 1000;
+  const trustCloudflareIpHeader = options.trustCloudflareIpHeader ??
+    process.env.PROJECTVAULT_TRUST_CF_CONNECTING_IP === 'true';
   const attempts = new Map<string, AttemptWindow>();
   const createAttempts = new Map<string, AttemptWindow>();
 
@@ -195,7 +199,10 @@ export function createInviteRouter(options: InviteRouterOptions = {}) {
 
   router.post('/api/workspaces/redeem-invite', express.json({ limit: '2kb' }), async (req: Request, res: Response) => {
     const now = Date.now();
-    const clientKey = req.ip || req.socket.remoteAddress || 'unknown';
+    const cloudflareIp = trustCloudflareIpHeader ? req.get('cf-connecting-ip') : undefined;
+    const clientKey = cloudflareIp && isIP(cloudflareIp) !== 0
+      ? cloudflareIp
+      : req.socket.remoteAddress || 'unknown';
     let window = attempts.get(clientKey);
 
     if (!window || window.resetAt <= now) {
