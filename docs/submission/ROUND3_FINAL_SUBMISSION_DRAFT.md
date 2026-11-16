@@ -121,7 +121,7 @@ Record the date, tester, test account role, exact steps, expected result, actual
 
 ### Confirmed evidence
 
-- GitHub Actions run `#43813583777` was reported as passing application tests, typecheck, production build, Playwright E2E and disposable PostgreSQL 17 migration/schema/adversarial tests.
+- GitHub Actions run [#43880847494](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43880847494) completed successfully on this submission-preparation branch. Both jobs passed: server security tests, TypeScript typecheck, production build, Playwright browser E2E tests, and disposable PostgreSQL 17 full-migration/schema/adversarial smoke tests. This does not prove managed Supabase behavior.
 - Render deployment `dep-dbtg5sajnfac73dcg47g` reached `live`.
 - Supabase project status was `ACTIVE_HEALTHY`.
 - Eleven migrations are recorded in the hosted migration history.
@@ -138,7 +138,7 @@ Record the date, tester, test account role, exact steps, expected result, actual
 - Persistent graph and automatic change-impact propagation are not delivered.
 - Individual member contributions have not been independently confirmed.
 
-Update this section with the latest workflow run URL, exact passing test counts, live test date, tester role, and evidence references. Never list a test as passing unless it was actually run.
+The exact workflow run URL is recorded above. Add the live test date, tester role, screenshots/log references and any additional exact test counts after the final judge-facing test pass. Never list a test as passing unless it was actually run.
 
 ## 8. Changes from the original plan
 
