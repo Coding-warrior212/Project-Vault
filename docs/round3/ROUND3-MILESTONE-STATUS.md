@@ -89,6 +89,5 @@ Milestone 2 remains **OPEN — not signed off**. The green CI run validates the 
 
 ### CI follow-up — 2026-11-16
 
-- GitHub Actions run [#43812894268](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43812894268) completed successfully for the Render-aware invite throttling code and regression test. Both application and database jobs passed, including server tests, typecheck, build, Playwright E2E, and the full local PostgreSQL 17 migration/adversarial harness.
-- The subsequent documentation-only branch-head update triggered run [#43813104728](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43813104728). Its database job passed; the application job was still installing Chromium for Playwright when checked. Treat the latest branch head as **CI in progress** until that job completes.
+- GitHub Actions run [#43813310350](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43813310350) completed successfully on the current branch head. Both the application and database jobs passed, including server security tests, typecheck, production build, all four browser E2E tests, and the full local PostgreSQL 17 migration/assertion/adversarial harness. The Render-aware invite throttling fix and its regression test are included in this run.
 - PR #1 metadata reports **60 changed files**, is open, draft, unmerged, and mergeable at this check. The branch head is `7abe16baea877ce18564e72e63492011758b2b49`.
