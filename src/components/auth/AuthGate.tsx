@@ -78,6 +78,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
   const loadWorkspaceAccess = React.useCallback(async () => {
     if (!supabase || !session?.user?.id) {
       setWorkspaces([]);
+      setActiveWorkspace(null);
       return;
     }
 
@@ -95,6 +96,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
       const rows = memberships ?? [];
       if (rows.length === 0) {
         setWorkspaces([]);
+        setActiveWorkspace(null);
         return;
       }
 
@@ -119,7 +121,10 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
       setActiveWorkspace((current) => current && !allowed.some((workspace) => workspace.id === current.id) ? null : current);
     } catch (loadError) {
       console.error('[ProjectVault Auth] Workspace access lookup failed:', loadError);
+      // Fail closed in the UI: do not leave a previously selected workspace
+      // mounted when membership verification can no longer be completed.
       setWorkspaces([]);
+      setActiveWorkspace(null);
       setError('Workspace access could not be verified. Your private workspaces are hidden until access can be confirmed.');
     } finally {
       setWorkspaceLoading(false);
@@ -128,8 +133,33 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
 
   React.useEffect(() => {
     if (session) void loadWorkspaceAccess();
-    else setWorkspaces([]);
+    else {
+      setWorkspaces([]);
+      setActiveWorkspace(null);
+    }
   }, [session, loadWorkspaceAccess]);
+
+  React.useEffect(() => {
+    if (!supabase || !session?.user?.id) return;
+
+    // Membership changes trigger a fresh server-authorized lookup. The database
+    // remains the security boundary; this subscription only keeps the UI current.
+    const channel = supabase
+      .channel('workspace-membership:' + session.user.id)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'workspace_members',
+        filter: 'user_id=eq.' + session.user.id,
+      }, () => {
+        void loadWorkspaceAccess();
+      })
+      .subscribe();
+
+    return () => {
+      void supabase?.removeChannel(channel);
+    };
+  }, [session?.user?.id, loadWorkspaceAccess]);
 
   const handleAuth = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -387,36 +417,19 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
               )}
               <label className="block">
                 <span className="pv-auth-label mb-1.5 block text-xs font-bold">Email address</span>
-                <input className="pv-auth-field" type="email" autoComplete="email" placeholder="you@company.com" value={email} onChange={(event) => setEmail(event.target.value)} required />
+                <input className="pv-auth-field" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} required />
               </label>
               <label className="block">
                 <span className="pv-auth-label mb-1.5 block text-xs font-bold">Password</span>
-                <input className="pv-auth-field" type="password" autoComplete={mode === 'sign_up' ? 'new-password' : 'current-password'} minLength={8} placeholder="At least 8 characters" value={password} onChange={(event) => setPassword(event.target.value)} required />
+                <input className="pv-auth-field" type="password" autoComplete={mode === 'sign_up' ? 'new-password' : 'current-password'} placeholder="At least 8 characters" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} required />
               </label>
-              <button className="pv-auth-primary flex w-full items-center justify-center gap-2 px-4 py-3.5 text-sm font-bold disabled:cursor-not-allowed" disabled={busy} type="submit">
-                {busy ? 'Please wait…' : mode === 'sign_up' ? 'Create your account' : 'Sign in securely'}
-                <ArrowRight className="h-4 w-4" />
-              </button>
+              <button type="submit" disabled={busy} className={buttonClass + ' w-full'}>{busy ? 'Please wait…' : mode === 'sign_up' ? 'Create account' : 'Sign in'}</button>
             </form>
 
-            {mode === 'sign_in' && <button type="button" disabled={busy} onClick={handlePasswordReset} className="mt-3 w-full text-center text-xs font-bold text-[#258D89] transition hover:text-[#25245F] disabled:opacity-50 dark:text-[#55C7C2] dark:hover:text-white">Forgot password?</button>}
-
-            <div className="my-5 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-wider text-[#85849B] dark:text-[#9693B4]">
-              <span className="h-px flex-1 bg-[#25245F]/15 dark:bg-white/15" />or continue with<span className="h-px flex-1 bg-[#25245F]/15 dark:bg-white/15" />
-            </div>
-            <button type="button" onClick={handleGoogleSignIn} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#25245F]/20 bg-white px-4 py-3 text-sm font-bold text-[#25245F] transition hover:border-[#55C7C2] hover:bg-[#FFFCF6] disabled:opacity-50 dark:border-white/15 dark:bg-[#15143C] dark:text-[#FFF4E3] dark:hover:bg-[#222154]">
+            <button type="button" onClick={() => void handleGoogleSignIn()} disabled={busy} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-[#25245F]/15 bg-white px-4 py-3 text-sm font-semibold text-[#25245F] transition hover:bg-[#F1EBDD] disabled:opacity-50 dark:border-white/15 dark:bg-[#1B1A48] dark:text-[#FFF4E3] dark:hover:bg-[#25245F]">
               <Chrome className="h-4 w-4" /> Continue with Google
             </button>
-
-            <div className="my-5 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-wider text-[#85849B] dark:text-[#9693B4]">
-              <span className="h-px flex-1 bg-[#25245F]/15 dark:bg-white/15" />or explore first<span className="h-px flex-1 bg-[#25245F]/15 dark:bg-white/15" />
-            </div>
-            <button type="button" onClick={() => { setLocalStorageScope('judge-demo'); setDemoMode(true); }} className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#55C7C2]/60 bg-[#55C7C2]/15 px-4 py-3 text-sm font-bold text-[#174F50] transition hover:bg-[#55C7C2]/25 dark:text-[#A7E8E3]">
-              Explore interactive demo <ArrowRight className="h-4 w-4" />
-            </button>
-            <p className="mt-5 text-center text-[10px] leading-5 text-[#65647E] dark:text-[#B9B6D1]">
-              Workspace access is enforced by Supabase Row Level Security—not by client-side filtering alone.
-            </p>
+            <button type="button" onClick={() => void handlePasswordReset()} disabled={busy} className="mt-3 w-full text-center text-xs font-semibold text-[#258D89] hover:underline dark:text-[#55C7C2]">Forgot password?</button>
             <AuthFeedback error={error} message={message} />
           </section>
         </div>
@@ -424,64 +437,39 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
     );
   }
 
-  if (session && isPasswordRecovery) {
+  if (isPasswordRecovery) {
     return (
       <AuthShell>
-        <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-950 text-white"><LockKeyhole className="h-6 w-6" /></div>
-          <h1 className="text-2xl font-bold text-slate-950">Choose a new password</h1>
-          <p className="mt-2 text-sm text-slate-600">Set a new password for {session.user.email}.</p>
-        </div>
-        <form onSubmit={handleSetNewPassword} className="space-y-3">
-          <input className={fieldClass} type="password" minLength={8} autoComplete="new-password" placeholder="New password (at least 8 characters)" value={password} onChange={(event) => setPassword(event.target.value)} required />
-          <button className={buttonClass + ' w-full'} type="submit" disabled={busy || password.length < 8}>{busy ? 'Updating…' : 'Update password'}</button>
+        <form onSubmit={handleSetNewPassword} className="space-y-4">
+          <h2 className="text-xl font-bold text-[#25245F] dark:text-[#FFF4E3]">Set a new password</h2>
+          <label className="block"><span className="pv-auth-label mb-1.5 block text-xs font-bold">New password</span><input className={fieldClass} type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} required /></label>
+          <button type="submit" disabled={busy || password.length < 8} className={buttonClass + ' w-full'}>{busy ? 'Updating…' : 'Update password'}</button>
+          <AuthFeedback error={error} message={message} />
         </form>
-        <AuthFeedback error={error} message={message} />
       </AuthShell>
     );
   }
 
-  if (activeWorkspace && workspaces.some((workspace) => workspace.id === activeWorkspace.id)) {
+  if (activeWorkspace) {
     return (
-      <WorkspaceSessionProvider value={{
-        session,
-        workspace: activeWorkspace,
-        selectWorkspace: setActiveWorkspace,
-        switchWorkspace: () => setActiveWorkspace(null),
-      }}>
-        <div className="pv-auth-page min-h-screen">
-          <div className="flex items-center justify-between gap-3 border-b border-[#25245F]/15 bg-white/90 px-4 py-3 shadow-sm backdrop-blur dark:border-white/10 dark:bg-[#1B1A48]/95 sm:px-8">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-extrabold text-[#25245F] dark:text-[#FFF4E3]">{activeWorkspace.name}</p>
-              <p className="text-[11px] text-[#65647E] dark:text-[#C1BED8]">{activeWorkspace.role} · {session.user.email}</p>
-            </div>
-            <button type="button" onClick={() => setActiveWorkspace(null)} className="shrink-0 rounded-lg border border-[#25245F]/20 px-3 py-2 text-xs font-bold text-[#25245F] transition hover:border-[#55C7C2] hover:bg-[#55C7C2]/10 dark:border-white/20 dark:text-[#FFF4E3] dark:hover:bg-white/5">Switch workspace</button>
-          </div>
-          {children}
-        </div>
+      <WorkspaceSessionProvider workspace={activeWorkspace} onExit={() => setActiveWorkspace(null)}>
+        {children}
       </WorkspaceSessionProvider>
     );
   }
 
   return (
     <AuthShell wide>
-      <div className="flex flex-col gap-4 border-b border-[#25245F]/10 pb-5 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#258D89] dark:text-[#55C7C2]">Authenticated session</p>
-          <h1 className="mt-1 text-2xl font-bold text-[#25245F] dark:text-[#FFF4E3]">Your workspace access</h1>
-          <p className="mt-1 text-sm text-[#65647E] dark:text-[#C1BED8]">{session.user.email}</p>
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-[#258D89] dark:text-[#55C7C2]">Workspace access</p>
+          <h1 className="mt-1 text-2xl font-extrabold text-[#25245F] dark:text-[#FFF4E3]">Choose where to continue.</h1>
+          <p className="mt-2 text-sm text-[#65647E] dark:text-[#C1BED8]">Signed in as {session.user.email}</p>
         </div>
-        <button type="button" onClick={handleSignOut} disabled={busy} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#25245F]/30 dark:border-white/20 px-3 py-2 text-xs font-semibold text-[#383765] dark:text-[#E7E3F4] transition-all duration-150 ease-out hover:-translate-y-1 hover:border-[#F36B3F] hover:shadow-[4px_4px_0px_0px_#F36B3F] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-50"><LogOut className="h-4 w-4" /> Sign out</button>
+        <button type="button" onClick={() => void handleSignOut()} disabled={busy} className="inline-flex items-center gap-2 rounded-lg border border-[#25245F]/15 px-3 py-2 text-xs font-semibold text-[#25245F] hover:bg-[#F1EBDD] dark:border-white/15 dark:text-[#FFF4E3] dark:hover:bg-white/5"><LogOut className="h-4 w-4" /> Sign out</button>
       </div>
 
-      <div className="pv-auth-panel pv-auth-accent mt-6 p-4 sm:p-5">
-        <div className="flex items-start gap-3">
-          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#174F50] dark:text-[#A7E8E3]" />
-          <div><p className="text-sm font-semibold text-[#174F50] dark:text-[#A7E8E3]">Identity verified by Supabase Auth</p><p className="mt-1 text-xs leading-5 text-[#245F60] dark:text-[#A7E8E3]">The list below is loaded through the signed-in user's JWT and workspace RLS policies. Only memberships returned by the database are displayed.</p></div>
-        </div>
-      </div>
-
-      <div className="mt-6">
+      <div className="mt-7">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-sm font-bold text-[#25245F] dark:text-[#FFF4E3]"><Users className="h-4 w-4" /> Workspaces you can access</h2>
           <button type="button" onClick={() => void loadWorkspaceAccess()} disabled={workspaceLoading} className="text-xs font-semibold text-[#258D89] dark:text-[#55C7C2] disabled:opacity-50">{workspaceLoading ? 'Refreshing…' : 'Refresh access'}</button>
