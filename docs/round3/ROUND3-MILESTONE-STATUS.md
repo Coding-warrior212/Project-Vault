@@ -57,3 +57,31 @@ No schema, data, Auth provider, Storage, secret, or deployment settings were cha
 - Do not mark Milestone 2 complete based on PostgreSQL stubs or empty-schema advisors.
 - The accepted Judge Demo is interactive within its isolated browser-local store; never claim it is read-only.
 - Keep the passing Judge Demo browser isolation regression in CI. It verifies tested demo flows only; do not generalize it into a full managed-backend security sign-off.
+
+## Automation review — 2026-11-16
+
+### Verified repository and CI state
+
+- The `round3-development` branch exists and compares to `main` as **203 commits ahead, 0 behind** at review time. This is a branch-history comparison, not a statement that all 203 commits are individually release-ready.
+- PR #1 currently lists **58 changed files**. The review API returned no submitted PR reviews or inline review threads.
+- GitHub Actions run [#43758917330](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43758917330) is confirmed complete with both jobs successful: server tests/typecheck/build/Playwright E2E, and all-migrations PostgreSQL 17 validation plus adversarial smoke tests.
+- Two follow-up commits from this review improve Render-aware invite throttling. Their CI result is **pending** at the time of this note; do not reuse the previous green run as evidence for those new commits.
+
+### New findings and mitigations
+
+1. **Render invite rate-limit client identity:** the invite router previously used `req.socket.remoteAddress` unless an opt-in environment flag was set. Render documents that inbound web-service traffic passes through Cloudflare and recommends using the client-IP header; Cloudflare documents `CF-Connecting-IP` as a single-address origin header. The router now automatically trusts a syntactically valid `CF-Connecting-IP` only when `RENDER=true`, unless `PROJECTVAULT_TRUST_CF_CONNECTING_IP` explicitly overrides the behavior. It continues to ignore `X-Forwarded-For`. A regression test covers two clients and a forged forwarded-for header. This code is committed; CI is pending.
+2. **Potential last-owner concurrency race — not yet reproduced:** `workspace_members_delete_policy` allows an owner to delete another membership, while `enforce_owner_minimum_after_change()` checks the remaining owner count in an AFTER trigger without first locking the parent workspace row. Two concurrent owner deletions of distinct membership rows may each see the other transaction's uncommitted owner row and both pass the count check, leaving the workspace ownerless. This is a static concurrency risk, not a reproduced exploit. Before sign-off, serialize owner membership removal/demotion on the workspace row (or route all such changes through a single locking RPC) and add a two-session race regression test.
+3. **Membership revocation UI refresh — not yet verified:** `AuthGate` loads memberships during session/workspace access refresh, but the workspace Realtime subscription list does not include `workspace_members`. A membership revoked while a user is already in the workspace may leave the active workspace selection and already-loaded browser state visible until a refresh, even though RLS should reject subsequent database requests. Add a revocation/session-staleness E2E test and ensure the client clears the active workspace when access is no longer present.
+
+### Hosted Supabase recheck — read-only
+
+- PostgreSQL **17.11**.
+- `supabase_realtime` publication exists.
+- Zero application tables in `public` and `private`.
+- Zero migration history entries returned by the Supabase migration-list API.
+- Security, Performance, and Health Advisors returned no lints on the empty schema.
+- No hosted schema/data/Auth/Storage/secret/deployment setting was changed.
+
+### Milestone disposition
+
+Milestone 2 remains **OPEN — not signed off**. The green CI run validates the disposable PostgreSQL harness and tested application flows, not managed Supabase/PostgREST/Auth/Storage/Realtime behavior. The newly identified owner-race and membership-revocation checks must be resolved before security sign-off. No user action is required for this review; no hosted migration, merge, or deployment is authorized.
