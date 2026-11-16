@@ -106,7 +106,7 @@ Commit `c7bd137` removes a global JSON parser from the invite-router test setup 
 
 ## Automation review — 2026-11-16 (latest)
 
-- Current PR #1 is open, draft, unmerged and mergeable; PR metadata reports 60 changed files. Current branch head: `2496ceb8d0527285dd24086a8d9ad683a2037b71`. No submitted review records or inline review threads were returned.
+- PR #1 is open, draft, unmerged and mergeable; PR metadata reports 60 changed files. No submitted review records or inline review threads were returned.
 - GitHub Actions run [#43813310350](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43813310350) passed both jobs on the current branch head: server tests, typecheck, production build, Playwright E2E, all SQL migrations on disposable PostgreSQL 17, schema assertions, and adversarial smoke tests.
 - Fixed Render invite throttling's default client identity: when `RENDER=true`, use a syntactically validated `CF-Connecting-IP` unless explicitly disabled by `PROJECTVAULT_TRUST_CF_CONNECTING_IP=false`; never use caller-controlled `X-Forwarded-For`. Regression is included in run #43813310350. The limiter remains process-local/in-memory.
 - New high-priority static risk: owner-minimum AFTER trigger does not serialize concurrent direct owner-membership deletions; two simultaneous removals may leave no owner. Not yet reproduced; add parent-workspace locking and a two-session race test before Milestone 2 sign-off.
