@@ -125,3 +125,41 @@ The cloud Realtime subscription now includes `activity_events`, which is loaded 
 Commit `47b085b` adds local adversarial checks that valid same-workspace references can be inserted, cross-workspace source/claim references are rejected, and deleting a referenced source/claim does not rewrite the immutable event. These checks passed in GitHub Actions run [#43681406630](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43681406630). The same run includes commit `c7bd137`, which adjusts the invite-route tests to exercise the route's own 2 KB parser and confirms an oversized payload is rejected before any Supabase request.
 
 **Milestone 2 remains OPEN.** The CI PostgreSQL harness is not managed Supabase. PostgREST transaction-bound capability behavior, managed function ownership/grants, Auth, Storage API, Realtime delivery, full role/tenant isolation, and concurrency remain unverified. The hosted database was not modified.
+
+## Review addendum — 2026-11-16
+
+### Latest confirmed verification
+
+GitHub Actions run [#43758917330](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43758917330) is confirmed complete with both jobs successful. The application job completed invite/server tests, TypeScript type-check, production build, Chromium install, and browser E2E. The database job completed the local PostgreSQL 17 runner that applies every migration. This is still stubbed local validation, not managed Supabase sign-off.
+
+The PR currently contains 58 changed paths. No submitted review records or inline review threads were returned by the GitHub review APIs. The two Render IP-throttling commits described below were created after run #43758917330, so they still require a new CI result.
+
+### Render-aware invite throttling fix
+
+The route previously fell back to `req.socket.remoteAddress` unless `PROJECTVAULT_TRUST_CF_CONNECTING_IP=true` was explicitly configured. Render's current documentation says inbound web-service traffic passes through Cloudflare and recommends using a client-IP header; Cloudflare documents `CF-Connecting-IP` as a single-address header for requests from its edge to an origin. Using the socket peer as the default on Render risks putting unrelated visitors into the same rate-limit bucket. The router now defaults to a validated `CF-Connecting-IP` when `RENDER=true`, keeps the explicit `PROJECTVAULT_TRUST_CF_CONNECTING_IP` override, and continues to ignore `X-Forwarded-For`.
+
+- Code commit: `ef3962306984903a124e0f7010dc551bffc0967c`
+- Regression-test commit: `065faf5b2c37fc03be2203b438975a660724142a`
+- CI for these commits: **pending at review time**.
+- The rate limiter remains in-memory and process-local; it is not a distributed limiter for a multi-process/multi-instance deployment. No paid Redis/Key Value service is proposed.
+
+References: [Render DDoS and client-IP guidance](https://render.com/articles/how-render-handles-ddos-attacks), [Render default environment variables](https://render.com/docs/environment-variables), and [Cloudflare HTTP headers](https://developers.cloudflare.com/fundamentals/reference/http-headers/).
+
+### Potential last-owner race — open security blocker
+
+Static review found that the owner-minimum AFTER trigger counts remaining owners but does not lock the parent workspace row first. The direct membership DELETE policy permits an owner to remove another membership (and permits self-removal). Two concurrent transactions deleting different owner rows may each observe the other transaction's uncommitted owner row, pass the count check, and commit, leaving zero owners. This has not been reproduced with two live sessions; treat it as a high-priority potential race until tested.
+
+Recommended correction: serialize owner membership removal/demotion on the parent workspace row before evaluating the final owner count, or disallow direct owner membership deletion and require a single atomic RPC with a consistent lock order. Add a two-session regression test that attempts concurrent owner removals and asserts that one transaction fails and exactly one owner remains. Do not mark owner-minimum protection verified until that test passes.
+
+### Membership revocation session-staleness risk
+
+The AuthGate re-queries memberships when session/workspace access is refreshed, but the workspace Realtime subscription currently covers application data tables and does not include `workspace_members`. If a member is removed while their app is open, the active workspace selection and already-loaded client-side records may remain visible until refresh, although RLS should reject subsequent reads/writes. This is a static integration risk; a revocation-in-an-open-session browser test and an explicit client state-clearing path are still required.
+
+### Hosted Supabase status — read-only recheck
+
+- PostgreSQL 17.11; `supabase_realtime` publication present.
+- Zero application tables in `public` and `private`; Supabase migration-list API returned zero entries.
+- Security, Performance, and Health Advisors returned no lints on the empty schema.
+- No hosted database, Auth, Storage, secret, or deployment changes were made.
+
+**Milestone 2 remains OPEN.** The latest local CI run is green, but managed Supabase roles/ownership, PostgREST transaction-bound capability behavior, actual JWT/RLS matrix, Auth, Storage, Realtime, concurrency, and post-migration advisors remain unverified. The owner-removal race and membership-revocation session behavior must also be closed before the security sign-off.
