@@ -167,4 +167,4 @@ The AuthGate re-queries memberships when session/workspace access is refreshed, 
 
 ### CI follow-up — 2026-11-16
 
-Run [#43812894268](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43812894268) confirms both CI jobs passed on the Render-aware invite throttling code/test commits. The subsequent branch-head documentation commit triggered run [#43813104728](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43813104728); the PostgreSQL job passed, while the application job was still installing Chromium for Playwright at the time of this check. Wait for the full application job before treating the current branch head as green.
+Run [#43813310350](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43813310350) completed successfully on the current branch head. Both the application and database jobs passed, including server tests, typecheck, build, Chromium Playwright E2E, and the complete local PostgreSQL 17 migration/assertion/adversarial harness. This run includes the Render-aware invite-throttling code and regression test. Wait for the full application job before treating the current branch head as green.
