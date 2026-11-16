@@ -39,8 +39,12 @@ export function createInviteRouter(options: InviteRouterOptions = {}) {
   const maxAttempts = options.maxAttempts ?? 8;
   const maxCreateAttempts = options.maxCreateAttempts ?? 5;
   const windowMs = options.windowMs ?? 15 * 60 * 1000;
+  const cloudflareTrustOverride = process.env.PROJECTVAULT_TRUST_CF_CONNECTING_IP;
+  // Render routes public web-service traffic through Cloudflare. Trust its
+  // single-address CF-Connecting-IP header there, but never trust X-Forwarded-For.
   const trustCloudflareIpHeader = options.trustCloudflareIpHeader ??
-    process.env.PROJECTVAULT_TRUST_CF_CONNECTING_IP === 'true';
+    (cloudflareTrustOverride === 'true' ||
+      (cloudflareTrustOverride !== 'false' && process.env.RENDER === 'true'));
   const attempts = new Map<string, AttemptWindow>();
   const createAttempts = new Map<string, AttemptWindow>();
 
