@@ -397,37 +397,46 @@ test('rejects oversized invite payloads before contacting Supabase', async () =>
 });
 
 
-test('redemption rate limiter uses validated Cloudflare IP and ignores forwarded-for', async () => {
-  const app = express();
-  app.use(createInviteRouter({
-    maxAttempts: 1,
-    trustCloudflareIpHeader: true,
-  }));
+test('Render automatically uses validated Cloudflare client IP and ignores forwarded-for', async () => {
+  const previousRender = process.env.RENDER;
+  const previousOverride = process.env.PROJECTVAULT_TRUST_CF_CONNECTING_IP;
+  process.env.RENDER = 'true';
+  delete process.env.PROJECTVAULT_TRUST_CF_CONNECTING_IP;
 
-  await withServer(app, async (url) => {
-    const send = (clientIp: string, forwardedFor: string) => fetch(
-      `${url}/api/workspaces/redeem-invite`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'CF-Connecting-IP': clientIp,
-          'X-Forwarded-For': forwardedFor,
+  try {
+    const app = express();
+    app.use(createInviteRouter({ maxAttempts: 1 }));
+
+    await withServer(app, async (url) => {
+      const send = (clientIp: string, forwardedFor: string) => fetch(
+        `${url}/api/workspaces/redeem-invite`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'CF-Connecting-IP': clientIp,
+            'X-Forwarded-For': forwardedFor,
+          },
+          body: JSON.stringify({ code: 'PV-AB12-CD34' }),
         },
-        body: JSON.stringify({ code: 'PV-AB12-CD34' }),
-      },
-    );
+      );
 
-    const first = await send('198.51.100.10', '203.0.113.1');
-    assert.equal(first.status, 503);
+      const first = await send('198.51.100.10', '203.0.113.1');
+      assert.equal(first.status, 503);
 
-    const sameClientWithForgedForwarding = await send(
-      '198.51.100.10',
-      '203.0.113.2',
-    );
-    assert.equal(sameClientWithForgedForwarding.status, 429);
+      const sameClientWithForgedForwarding = await send(
+        '198.51.100.10',
+        '203.0.113.2',
+      );
+      assert.equal(sameClientWithForgedForwarding.status, 429);
 
-    const differentClient = await send('198.51.100.11', '203.0.113.1');
-    assert.equal(differentClient.status, 503);
-  });
+      const differentClient = await send('198.51.100.11', '203.0.113.1');
+      assert.equal(differentClient.status, 503);
+    });
+  } finally {
+    if (previousRender === undefined) delete process.env.RENDER;
+    else process.env.RENDER = previousRender;
+    if (previousOverride === undefined) delete process.env.PROJECTVAULT_TRUST_CF_CONNECTING_IP;
+    else process.env.PROJECTVAULT_TRUST_CF_CONNECTING_IP = previousOverride;
+  }
 });
