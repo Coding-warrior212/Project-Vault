@@ -163,3 +163,8 @@ The AuthGate re-queries memberships when session/workspace access is refreshed, 
 - No hosted database, Auth, Storage, secret, or deployment changes were made.
 
 **Milestone 2 remains OPEN.** The latest local CI run is green, but managed Supabase roles/ownership, PostgREST transaction-bound capability behavior, actual JWT/RLS matrix, Auth, Storage, Realtime, concurrency, and post-migration advisors remain unverified. The owner-removal race and membership-revocation session behavior must also be closed before the security sign-off.
+
+
+### CI follow-up — 2026-11-16
+
+Run [#43812894268](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43812894268) confirms both CI jobs passed on the Render-aware invite throttling code/test commits. The subsequent branch-head documentation commit triggered run [#43813104728](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43813104728); the PostgreSQL job passed, while the application job was still installing Chromium for Playwright at the time of this check. Wait for the full application job before treating the current branch head as green.
