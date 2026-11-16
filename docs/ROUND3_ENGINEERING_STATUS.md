@@ -103,3 +103,13 @@ GitHub Actions run [#43681406630](https://github.com/Coding-warrior212/Project-V
 - PostgreSQL 17 job: pass after applying every migration file, including the append-only activity-reference migration, running the updated schema assertions, and executing the cross-workspace reference/source-deletion smoke checks.
 
 Commit `c7bd137` removes a global JSON parser from the invite-router test setup so the route's own 2 KB limit is tested, and adds an oversized-body 413 test. Both application and database CI jobs passed on the resulting branch snapshot. The application route is mounted before the global 35 MB parser in `server.ts`.
+
+## Automation review — 2026-11-16 (latest)
+
+- Current PR #1 is open, draft, unmerged and mergeable; PR metadata reports 60 changed files. Current branch head: `2496ceb8d0527285dd24086a8d9ad683a2037b71`. No submitted review records or inline review threads were returned.
+- GitHub Actions run [#43813310350](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43813310350) passed both jobs on the current branch head: server tests, typecheck, production build, Playwright E2E, all SQL migrations on disposable PostgreSQL 17, schema assertions, and adversarial smoke tests.
+- Fixed Render invite throttling's default client identity: when `RENDER=true`, use a syntactically validated `CF-Connecting-IP` unless explicitly disabled by `PROJECTVAULT_TRUST_CF_CONNECTING_IP=false`; never use caller-controlled `X-Forwarded-For`. Regression is included in run #43813310350. The limiter remains process-local/in-memory.
+- New high-priority static risk: owner-minimum AFTER trigger does not serialize concurrent direct owner-membership deletions; two simultaneous removals may leave no owner. Not yet reproduced; add parent-workspace locking and a two-session race test before Milestone 2 sign-off.
+- New session-staleness risk: AuthGate does not subscribe to workspace_members changes. Revocation while the app is open may leave active selection and loaded client data visible until refresh, though RLS should deny later database requests. Add a revocation E2E test and state-clearing behavior.
+- Hosted Supabase rechecked read-only: PostgreSQL 17.11, Realtime publication present, zero app tables, zero migration records, no Security/Performance/Health advisor lints on the empty schema. No hosted changes made.
+- Milestone 2 remains open. No production migration, deployment, merge, secret change, or paid service was used.
