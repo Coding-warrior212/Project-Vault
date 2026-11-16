@@ -62,7 +62,7 @@ No schema, data, Auth provider, Storage, secret, or deployment settings were cha
 
 ### Verified repository and CI state
 
-- The `round3-development` branch exists and compares to `main` as **203 commits ahead, 0 behind** at review time. This is a branch-history comparison, not a statement that all 203 commits are individually release-ready.
+- The `round3-development` branch exists and compares to `main` as ahead and 0 behind at review time. This is a branch-history comparison, not a statement that every development commit is release-ready.
 - PR #1 currently lists **60 changed files**. The review API returned no submitted PR reviews or inline review threads.
 - GitHub Actions run [#43758917330](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43758917330) is confirmed complete with both jobs successful: server tests/typecheck/build/Playwright E2E, and all-migrations PostgreSQL 17 validation plus adversarial smoke tests.
 - Two follow-up commits from this review improve Render-aware invite throttling. Their CI result is **pending** at the time of this note; do not reuse the previous green run as evidence for those new commits.
