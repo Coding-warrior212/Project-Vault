@@ -30,6 +30,8 @@ import {
 } from 'lucide-react';
 import { SourceType3DGlyph } from '../common/Soft3DVisuals';
 import { getStoredFile } from '../../services/db';
+import { useWorkspaceSession } from '../auth/WorkspaceSessionContext';
+import { downloadWorkspaceSourceFile } from '../../services/workspaceCloud';
 
 interface SourceDetailModalProps {
   source: Source | null;
@@ -39,6 +41,7 @@ interface SourceDetailModalProps {
   onNavigateToLedger: () => void;
   onDeleteSource?: (sourceId: string) => void;
   onReconstructSource?: (source: Source) => void;
+  onSyncGitHubSource?: (source: Source) => Promise<void>;
 }
 
 export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
@@ -49,13 +52,17 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
   onNavigateToLedger,
   onDeleteSource,
   onReconstructSource,
+  onSyncGitHubSource,
 }) => {
+  const cloud = useWorkspaceSession();
   const [activeTab, setActiveTab] = React.useState<'extracted' | 'pages' | 'excerpt' | 'claims'>('extracted');
   const [selectedPageNum, setSelectedPageNum] = React.useState<number>(1);
   const [copiedText, setCopiedText] = React.useState(false);
   const [copiedHash, setCopiedHash] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [searchInDoc, setSearchInDoc] = React.useState('');
+  const [downloadError, setDownloadError] = React.useState<string | null>(null);
+  const [isSyncingGitHub, setIsSyncingGitHub] = React.useState(false);
 
   React.useEffect(() => {
     if (source) {
@@ -63,6 +70,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
       setSelectedPageNum(1);
       setIsDeleting(false);
       setSearchInDoc('');
+      setDownloadError(null);
     }
   }, [source?.id]);
 
@@ -99,6 +107,16 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
 
   const handleDownloadOriginal = async () => {
     try {
+      if (cloud) {
+        const file = await downloadWorkspaceSourceFile(cloud.workspace.id, source.id);
+        const anchor = document.createElement('a');
+        anchor.href = file.url;
+        anchor.download = file.filename;
+        anchor.rel = 'noopener';
+        anchor.click();
+        setDownloadError(null);
+        return;
+      }
       const stored = await getStoredFile(source.id);
       if (stored && stored.blob) {
         const url = URL.createObjectURL(stored.blob);
@@ -112,9 +130,18 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
         handleDownloadExtractedText();
       }
     } catch (err) {
-      console.warn('Original file download failed, downloading text instead:', err);
-      handleDownloadExtractedText();
+      console.warn('Original file download failed:', err);
+      if (cloud) setDownloadError(err instanceof Error ? err.message : 'Secure download failed.');
+      else handleDownloadExtractedText();
     }
+  };
+
+  const handleSyncGitHub = async () => {
+    if (!onSyncGitHubSource || !source) return;
+    setIsSyncingGitHub(true);
+    try { await onSyncGitHubSource(source); }
+    catch { /* parent surfaces the actionable error */ }
+    finally { setIsSyncingGitHub(false); }
   };
 
   const handleDelete = () => {
@@ -147,7 +174,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
                 {isUserUploaded ? (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    USER UPLOADED · INDEXEDDB
+                    {cloud ? 'USER UPLOADED · PRIVATE CLOUD' : 'USER UPLOADED · INDEXEDDB'}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-white/10 text-white/90 border border-white/20">
@@ -347,6 +374,11 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
                   )}
                 </button>
 
+                {source.type === 'github' && source.isUserUploaded && source.githubUrl && onSyncGitHubSource && <button
+                  type="button" onClick={handleSyncGitHub} disabled={isSyncingGitHub}
+                  className="px-2.5 py-1 text-xs font-bold text-white bg-[#25245F] hover:bg-[#1B1A48] rounded-md border border-[#25245F] disabled:opacity-50"
+                  title="Fetch the latest commit and refresh the documentation snapshot"
+                >{isSyncingGitHub ? 'Syncing…' : 'Sync latest'}</button>}
                 <button
                   onClick={handleDownloadOriginal}
                   className="px-2.5 py-1 text-xs font-bold text-neutral-700 dark:text-[#FFF4E3] bg-neutral-100 dark:bg-[#14133B] hover:bg-neutral-200 dark:hover:bg-[#25245F] rounded-md border border-neutral-300 dark:border-[#35337C] transition-colors flex items-center gap-1 cursor-pointer"
@@ -356,6 +388,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
                   <span>Download</span>
                 </button>
               </div>
+              {downloadError && <p role="alert" className="mt-2 text-[11px] text-rose-600">{downloadError}</p>}
             </div>
 
             {/* TAB 1: Full Extracted Text */}

@@ -27,6 +27,8 @@ import { SourceDetailModal } from './components/sources/SourceDetailModal';
 import { ReconstructModal } from './components/sources/ReconstructModal';
 import { KnowledgeLedgerPage } from './components/ledger/KnowledgeLedgerPage';
 import { ReviewPage } from './components/review/ReviewPage';
+import { KnowledgeGraphPage } from './components/graph/KnowledgeGraphPage';
+import { fetchPublicGitHubSnapshot } from './services/githubSnapshot';
 import { HandoverPage } from './components/handover/HandoverPage';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { ClaimModal } from './components/common/ClaimModal';
@@ -42,6 +44,7 @@ import {
   saveStoredMissingInfo,
   getAllStoredQuestions,
   saveStoredQuestions,
+  clearJudgeDemoPersistence,
 } from './services/db';
 import {
   INITIAL_CONFLICTS,
@@ -49,19 +52,26 @@ import {
   INITIAL_QUESTIONS,
 } from './data/sampleData';
 import { ProjectConflict, MissingInfoFinding, UnresolvedQuestion } from './types';
+import { useWorkspaceSession } from './components/auth/WorkspaceSessionContext';
+import { appendWorkspaceActivity, countWorkspaceSourceClaims, deleteWorkspaceSource, loadWorkspaceData, saveWorkspaceClaims, saveWorkspaceConflicts, saveWorkspaceMissingInfo, saveWorkspaceQuestions, saveWorkspaceSource, subscribeWorkspaceChanges, updateWorkspaceClaim, updateWorkspaceClaimFlag, uploadWorkspaceSourceFile } from './services/workspaceCloud';
 
 export default function App() {
+  const cloud = useWorkspaceSession();
+  const activeWorkspaceId = cloud?.workspace.id;
+  const activeActor = cloud ? (cloud.session.user.user_metadata?.full_name || cloud.session.user.email || 'Workspace member') : 'Elena Rostova';
   const [currentPage, setCurrentPage] = React.useState<AppPage>('overview');
-  const [currentWorkspace, setCurrentWorkspace] = React.useState<Workspace>(
-    SAMPLE_WORKSPACES[0]
-  );
-  const [sources, setSources] = React.useState<Source[]>(INITIAL_SOURCES);
-  const [claims, setClaims] = React.useState<KnowledgeClaim[]>(INITIAL_CLAIMS);
-  const [conflicts, setConflicts] = React.useState<ProjectConflict[]>(INITIAL_CONFLICTS);
-  const [missingInfo, setMissingInfo] = React.useState<MissingInfoFinding[]>(INITIAL_MISSING_INFO);
-  const [questions, setQuestions] = React.useState<UnresolvedQuestion[]>(INITIAL_QUESTIONS);
-  const [activity, setActivity] = React.useState<ActivityEvent[]>(SAMPLE_ACTIVITY);
-  const [isDbLoading, setIsDbLoading] = React.useState<boolean>(true);
+  const [currentWorkspace, setCurrentWorkspace] = React.useState<Workspace>(() => cloud ? ({
+    id: cloud.workspace.id, name: cloud.workspace.name, code: cloud.workspace.code,
+    description: cloud.workspace.description, role: cloud.workspace.role,
+    projectType: cloud.workspace.projectType, createdAt: new Date().toISOString(),
+  }) : SAMPLE_WORKSPACES[0]);
+  const [sources, setSources] = React.useState<Source[]>(cloud ? [] : INITIAL_SOURCES);
+  const [claims, setClaims] = React.useState<KnowledgeClaim[]>(cloud ? [] : INITIAL_CLAIMS);
+  const [conflicts, setConflicts] = React.useState<ProjectConflict[]>(cloud ? [] : INITIAL_CONFLICTS);
+  const [missingInfo, setMissingInfo] = React.useState<MissingInfoFinding[]>(cloud ? [] : INITIAL_MISSING_INFO);
+  const [questions, setQuestions] = React.useState<UnresolvedQuestion[]>(cloud ? [] : INITIAL_QUESTIONS);
+  const [activity, setActivity] = React.useState<ActivityEvent[]>(cloud ? [] : SAMPLE_ACTIVITY);
+  const [isDbLoading, setIsDbLoading] = React.useState<boolean>(Boolean(cloud));
 
   // Modals & Drawers state
   const [inspectingClaim, setInspectingClaim] = React.useState<KnowledgeClaim | null>(null);
@@ -74,6 +84,32 @@ export default function App() {
 
   // Load user-uploaded sources, persistent reconstructed claims, and review engine findings from storage on startup
   React.useEffect(() => {
+    if (cloud && activeWorkspaceId) {
+      let active = true;
+      let unsubscribe: (() => void) | undefined;
+      setIsDbLoading(true);
+      // Clear demo state before the private workspace request resolves. This prevents
+      // sample/demo records from flashing in an authenticated team workspace.
+      setSources([]); setClaims([]); setConflicts([]); setMissingInfo([]); setQuestions([]); setActivity([]);
+      setCurrentWorkspace({
+        id: cloud.workspace.id, name: cloud.workspace.name, code: cloud.workspace.code,
+        description: cloud.workspace.description, role: cloud.workspace.role,
+        projectType: cloud.workspace.projectType, createdAt: new Date().toISOString(),
+      });
+      const refresh = async () => {
+        const data = await loadWorkspaceData(activeWorkspaceId);
+        if (!active) return;
+        setSources(data.sources); setClaims(data.claims); setConflicts(data.conflicts);
+        setMissingInfo(data.missingInfo); setQuestions(data.questions); setActivity(data.activity);
+      };
+      void refresh().then(() => {
+        if (active) unsubscribe = subscribeWorkspaceChanges(activeWorkspaceId, () => { void refresh().catch((e) => console.error('Workspace refresh failed', e)); });
+      }).catch((e) => {
+        console.error('Workspace cloud load failed:', e);
+        if (active) alert('Could not load this workspace. No local demo data was shown. Check your connection and workspace permissions.');
+      }).finally(() => { if (active) setIsDbLoading(false); });
+      return () => { active = false; unsubscribe?.(); };
+    }
     let isMounted = true;
 
     async function loadStoredData() {
@@ -141,49 +177,61 @@ export default function App() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [activeWorkspaceId]);
 
   // Review Engine handlers
   const [isAnalyzingConflicts, setIsAnalyzingConflicts] = React.useState(false);
   const [conflictAnalysisResult, setConflictAnalysisResult] = React.useState<{ analyzed: number; discovered: number; timestamp: string } | null>(null);
 
   const handleRunConflictAnalysis = async () => {
+    if (!cloud || !activeWorkspaceId || !cloud.session.access_token) {
+      alert('AI conflict analysis requires a signed-in workspace.');
+      return;
+    }
+
     setIsAnalyzingConflicts(true);
+
     try {
       const res = await fetch('/api/gemini/analyze-conflicts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claims }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cloud.session.access_token}`,
+        },
+        body: JSON.stringify({ workspaceId: activeWorkspaceId }),
       });
+
       const data = await res.json();
-      if (!res.ok) {
+
+      if (!res.ok || !data.success) {
         throw new Error(data.error || 'Conflict analysis request failed.');
       }
 
-      if (data.success && data.conflicts) {
-        // Fetch latest stored conflicts from persistence to avoid stale state
-        const storedConflicts = await getAllStoredConflicts();
-        const baseConflicts = storedConflicts.length > 0 ? storedConflicts : conflicts;
-
+      if (Array.isArray(data.conflicts)) {
+        // Use the current workspace state as the merge base. Never read or write
+        // another workspace's conflicts through browser-side demo persistence.
         const existingMap = new Map<string, ProjectConflict>();
-        baseConflicts.forEach(c => {
-          if (c.relatedClaimIds && c.relatedClaimIds.length >= 2) {
-            const key = c.relatedClaimIds.slice().sort().join('-');
-            existingMap.set(key, c);
+
+        conflicts.forEach((conflict) => {
+          if (conflict.relatedClaimIds && conflict.relatedClaimIds.length >= 2) {
+            const key = conflict.relatedClaimIds.slice().sort().join('-');
+            existingMap.set(key, conflict);
           } else {
-            existingMap.set(c.id, c);
+            existingMap.set(conflict.id, conflict);
           }
         });
 
         let newDiscovered = 0;
-        for (const aiConf of data.conflicts) {
+
+        for (const aiConf of data.conflicts as ProjectConflict[]) {
           const key = aiConf.relatedClaimIds && aiConf.relatedClaimIds.length >= 2
             ? aiConf.relatedClaimIds.slice().sort().join('-')
             : aiConf.id;
 
           if (existingMap.has(key)) {
             const existing = existingMap.get(key)!;
-            // Preserve original ID, review status (resolved/dismissed), notes, and timestamps
+
+            // Preserve review decisions and original identity across AI re-runs.
             existingMap.set(key, {
               ...aiConf,
               id: existing.id,
@@ -199,17 +247,20 @@ export default function App() {
         }
 
         const merged = Array.from(existingMap.values());
+
+        // Persist first; update the UI only after the workspace save succeeds.
+        await saveWorkspaceConflicts(activeWorkspaceId, merged);
         setConflicts(merged);
-        await saveStoredConflicts(merged);
+
         setConflictAnalysisResult({
-          analyzed: data.analyzedCount,
+          analyzed: data.analyzedCount ?? claims.length,
           discovered: newDiscovered,
           timestamp: new Date().toLocaleTimeString(),
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Conflict analysis failed:', err);
-      alert(err.message || 'Failed to run conflict analysis.');
+      alert(err instanceof Error ? err.message : 'Failed to run conflict analysis.');
     } finally {
       setIsAnalyzingConflicts(false);
     }
@@ -218,13 +269,15 @@ export default function App() {
   const handleUpdateConflictStatus = async (conflictId: string, status: ProjectConflict['status'], note?: string) => {
     const updated = conflicts.map(c => c.id === conflictId ? { ...c, status, resolvedNote: note !== undefined ? note : c.resolvedNote } : c);
     setConflicts(updated);
-    await saveStoredConflicts(updated);
+    if (activeWorkspaceId) await saveWorkspaceConflicts(activeWorkspaceId, updated);
+    else await saveStoredConflicts(updated);
   };
 
   const handleUpdateMissingInfoStatus = async (itemId: string, status: MissingInfoFinding['status']) => {
     const updated = missingInfo.map(m => m.id === itemId ? { ...m, status } : m);
     setMissingInfo(updated);
-    await saveStoredMissingInfo(updated);
+    if (activeWorkspaceId) await saveWorkspaceMissingInfo(activeWorkspaceId, updated);
+    else await saveStoredMissingInfo(updated);
   };
 
   const handleUpdateQuestion = async (qId: string, status: UnresolvedQuestion['status'], answer?: string) => {
@@ -234,14 +287,15 @@ export default function App() {
           ...q,
           status,
           answer: answer !== undefined ? answer : q.answer,
-          answeredBy: answer ? 'Elena Rostova (Lead Architect)' : q.answeredBy,
+          answeredBy: answer ? activeActor : q.answeredBy,
           answeredAt: answer ? 'Just now' : q.answeredAt,
         };
       }
       return q;
     });
     setQuestions(updated);
-    await saveStoredQuestions(updated);
+    if (activeWorkspaceId) await saveWorkspaceQuestions(activeWorkspaceId, updated);
+    else await saveStoredQuestions(updated);
   };
 
   // Status counters
@@ -264,34 +318,58 @@ export default function App() {
       ...target,
       verificationStatus: newStatus,
       humanReviewNotes: note !== undefined ? note : target.humanReviewNotes,
-      lastReviewedBy: 'Elena Rostova (Lead Architect)',
+      lastReviewedBy: activeActor,
       lastReviewedAt: 'Just now',
     };
 
-    console.log(`[DIAGNOSTIC] handleUpdateClaimStatus updating claim ${claimId}:`, {
-      from: target.verificationStatus,
-      to: newStatus,
-      updatedClaim,
-    });
+    // Persist first. Never show an unconfirmed verification change.
+    try {
+      if (activeWorkspaceId) {
+        await updateWorkspaceClaim(activeWorkspaceId, updatedClaim);
+      } else {
+        await saveStoredClaims([updatedClaim]);
+      }
+    } catch (err) {
+      console.error(`[DIAGNOSTIC] FAILED to persist claim ${claimId}:`, err);
 
-    // 1. Immediately update interface state
-    setClaims((prev) => prev.map((c) => (c.id === claimId ? updatedClaim : c)));
+      const errorInfo = err && typeof err === 'object'
+        ? err as { code?: string; message?: string; details?: string; hint?: string }
+        : {};
 
-    // 2. Update inspecting claim if open
+      const errorText = [
+        errorInfo.message,
+        errorInfo.details,
+        errorInfo.hint,
+      ].filter(Boolean).join(' ').toLowerCase();
+
+      const permissionDenied =
+        errorInfo.code === '42501' ||
+        errorText.includes('rbac_denied') ||
+        errorText.includes('editors cannot verify') ||
+        errorText.includes('permission denied');
+
+      alert(
+        permissionDenied
+          ? 'Permission denied — your workspace role cannot change claim verification status or reviewer metadata. The original claim status was preserved.'
+          : `Could not save the claim update. Your original claim status was preserved. ${
+              errorInfo.message || 'Please check your connection and try again.'
+            }`
+      );
+      return;
+    }
+
+    // Update the interface only after the database confirms the save.
+    setClaims((prev) =>
+      prev.map((claim) => claim.id === claimId ? updatedClaim : claim)
+    );
+
     if (inspectingClaim?.id === claimId) {
       setInspectingClaim(updatedClaim);
     }
 
-    // 3. Persist to storage (IndexedDB + localStorage) with diagnostics
-    try {
-      await saveStoredClaims([updatedClaim]);
-      console.log(`[DIAGNOSTIC] Successfully saved updated claim ${claimId} co-persisted.`);
-    } catch (err) {
-      console.error(`[DIAGNOSTIC] FAILED to persist updated claim ${claimId}:`, err);
-      throw err;
-    }
+    console.log(`[DIAGNOSTIC] Successfully saved claim ${claimId}.`);
 
-    // 4. Record activity event
+    // Record activity only after successful persistence.
     const eventType =
       newStatus === 'verified'
         ? 'claim_verified'
@@ -305,11 +383,16 @@ export default function App() {
       timestamp: 'Just now',
       title: `Claim #${claimId} ${newStatus === 'verified' ? 'Verified & Approved' : newStatus === 'rejected' ? 'Rejected' : 'Flagged Uncertain'}`,
       description: target.statement,
-      actor: 'Elena Rostova',
+      actor: activeActor,
       claimId,
     };
 
     setActivity((prev) => [newActivity, ...prev]);
+
+    if (activeWorkspaceId) {
+      void appendWorkspaceActivity(activeWorkspaceId, newActivity)
+        .catch((e) => alert('Activity could not be synchronized: ' + e.message));
+    }
   };
 
   // Handle toggling persistent flag state on a claim
@@ -318,40 +401,65 @@ export default function App() {
     if (!target) return;
 
     const newFlagState = !target.isFlagged;
+
     const updatedClaim: KnowledgeClaim = {
       ...target,
       isFlagged: newFlagState,
       flaggedAt: newFlagState ? new Date().toISOString() : undefined,
-      flaggedBy: newFlagState ? 'Elena Rostova (Lead Architect)' : undefined,
+      flaggedBy: newFlagState ? activeActor : undefined,
     };
 
-    // 1. Immediately update interface state
-    setClaims((prev) => prev.map((c) => (c.id === claimId ? updatedClaim : c)));
+    // Persist first. Never show an unconfirmed flag change.
+    try {
+      if (activeWorkspaceId) {
+        await updateWorkspaceClaimFlag(activeWorkspaceId, updatedClaim);
+      } else {
+        await saveStoredClaims([updatedClaim]);
+      }
+    } catch (err) {
+      console.error(`Failed to persist flag state for claim ${claimId}:`, err);
 
-    // 2. Update inspecting claim if open
+      const message = err instanceof Error
+        ? err.message
+        : 'Please check your connection and try again.';
+
+      alert(
+        `Could not save the flag change. Your original flag state was preserved. ${message}`
+      );
+      return;
+    }
+
+    // Update the interface only after persistence succeeds.
+    setClaims((prev) =>
+      prev.map((claim) => claim.id === claimId ? updatedClaim : claim)
+    );
+
     if (inspectingClaim?.id === claimId) {
       setInspectingClaim(updatedClaim);
     }
 
-    // 3. Persist to IndexedDB so it survives page refresh
-    try {
-      await saveStoredClaims([updatedClaim]);
-    } catch (err) {
-      console.warn('Failed to persist flagged claim to IndexedDB:', err);
-    }
-
-    // 4. Record Activity event
+    // Record activity only after successful persistence.
     const newAct: ActivityEvent = {
       id: `act-${Date.now()}`,
       type: newFlagState ? 'claim_flagged' : 'claim_unflagged',
       timestamp: 'Just now',
-      title: newFlagState ? `Claim #${claimId} Flagged for Review` : `Flag Removed from Claim #${claimId}`,
+      title: newFlagState
+        ? `Claim #${claimId} Flagged for Review`
+        : `Flag Removed from Claim #${claimId}`,
       description: updatedClaim.statement,
-      actor: 'Elena Rostova',
+      actor: activeActor,
       claimId,
       sourceId: updatedClaim.sourceId,
     };
+
     setActivity((prev) => [newAct, ...prev]);
+
+    if (activeWorkspaceId) {
+      void appendWorkspaceActivity(activeWorkspaceId, newAct)
+        .catch((e) =>
+          alert('Activity could not be synchronized: ' + e.message)
+        );
+    }
   };
 
   // Handle adding a newly ingested source (from upload or connector)
@@ -370,6 +478,7 @@ export default function App() {
       sourceId: newSource.id,
     };
     setActivity((prev) => [newAct, ...prev]);
+    if (activeWorkspaceId) void appendWorkspaceActivity(activeWorkspaceId, newAct).catch((e) => alert('Source activity could not be synchronized: ' + e.message));
   };
 
   // Handle opening Reconstruct modal for a given source
@@ -378,48 +487,109 @@ export default function App() {
     setIsReconstructModalOpen(true);
   };
 
-  // Handle knowledge claims reconstructed by Gemini
-  const handleClaimsExtracted = (
+  // Persist reconstructed claims before exposing success in the UI.
+  // Existing claims and their human-review history are intentionally preserved.
+  const handleClaimsExtracted = async (
     sourceId: string,
     newClaims: KnowledgeClaim[],
     updatedSource: Source
-  ) => {
-    // 1. Update sources state
-    setSources((prev) =>
-      prev.map((s) => (s.id === sourceId ? updatedSource : s))
-    );
+  ): Promise<{ insertedCount: number; totalCount: number }> => {
+    if (!activeWorkspaceId) {
+      throw new Error('No active cloud workspace is available. Sign in again and retry.');
+    }
 
-    // 2. Remove old claims for this source and prepend new claims
-    setClaims((prev) => [
-      ...newClaims,
-      ...prev.filter((c) => c.sourceId !== sourceId),
-    ]);
+    const insertedCount = await saveWorkspaceClaims(activeWorkspaceId, newClaims);
+    const totalSourceClaims = await countWorkspaceSourceClaims(activeWorkspaceId, sourceId);
+    const persistedSource = {
+      ...updatedSource,
+      claimsCount: totalSourceClaims,
+    };
+    await saveWorkspaceSource(activeWorkspaceId, persistedSource);
 
-    // 3. Record Activity event
     const newAct: ActivityEvent = {
       id: `act-${Date.now()}`,
       type: 'knowledge_reconstructed',
       timestamp: 'Just now',
       title: `Knowledge Reconstructed: ${updatedSource.title}`,
-      description: `Synthesized ${newClaims.length} atomic claims with Gemini 3.8 Flash (${newClaims.filter((c) => c.evidenceGrounded).length} grounded to verbatim citations). Stored in IndexedDB.`,
+      description: `Inserted ${insertedCount} new claims; ${totalSourceClaims} claims now exist for this source. ${newClaims.filter((c) => c.evidenceGrounded).length} extracted claims were grounded to verbatim source quotations. Claims remain unverified pending human review.`,
       actor: 'Gemini 3.8 Flash',
       sourceId,
     };
-    setActivity((prev) => [newAct, ...prev]);
+
+    // Activity is secondary to the persisted source and claims.
+    try {
+      await appendWorkspaceActivity(activeWorkspaceId, newAct);
+      setActivity((prev) => [newAct, ...prev]);
+    } catch (error) {
+      console.warn('Claims were saved, but the activity event could not be recorded:', error);
+    }
+
+    setSources((prev) =>
+      prev.map((item) => item.id === sourceId ? persistedSource : item)
+    );
+    setClaims((prev) => [
+      ...newClaims.filter((claim) => !prev.some((existing) => existing.id === claim.id)),
+      ...prev,
+    ]);
+
+    return { insertedCount, totalCount: totalSourceClaims };
+  };
+
+  const handleSyncGitHubSource = async (source: Source) => {
+    if (source.type !== 'github' || !source.githubUrl) return;
+    try {
+      const snapshot = await fetchPublicGitHubSnapshot(source.githubUrl, source.repoBranch || '');
+      const file = new globalThis.File([snapshot.snapshot], `${snapshot.repo}-${snapshot.branch}-snapshot.md`, { type: 'text/markdown' });
+      const hash = await (await import('./services/extractor')).computeFileHash(file);
+      const updatedSource: Source = {
+        ...source, title: source.title || `${snapshot.owner}/${snapshot.repo}`,
+        filename: `${snapshot.owner}/${snapshot.repo}@${snapshot.branch}`,
+        repoBranch: snapshot.branch, githubOwner: snapshot.owner, githubRepo: snapshot.repo,
+        githubUrl: snapshot.url, commitSha: snapshot.commitSha, lastSyncedAt: new Date().toISOString(),
+        size: `${(file.size / 1024).toFixed(1)} KB`, sizeBytes: file.size,
+        ingestedAt: 'Just now', timestamp: Date.now(), extractedText: snapshot.snapshot,
+        rawExcerpt: snapshot.snapshot.slice(0, 300), charCount: snapshot.snapshot.length,
+        wordCount: snapshot.snapshot.trim().split(/\\s+/).length, contentHash: hash,
+        summary: `${snapshot.description} Synced ${snapshot.filesIncluded} documentation files at commit ${snapshot.commitSha.slice(0, 12)}.`,
+        tags: ['GitHub', 'Public Repository', 'Documentation Snapshot'],
+      };
+      if (activeWorkspaceId) {
+        await uploadWorkspaceSourceFile(activeWorkspaceId, updatedSource, file, false);
+        await saveWorkspaceSource(activeWorkspaceId, updatedSource);
+      } else {
+        const { saveStoredSource, saveStoredFile } = await import('./services/db');
+        await saveStoredSource(updatedSource);
+        await saveStoredFile(updatedSource.id, file);
+      }
+      setSources((previous) => previous.map((item) => item.id === source.id ? updatedSource : item));
+      const event: ActivityEvent = {
+        id: `act-${Date.now()}`, type: 'github_synced', timestamp: 'Just now',
+        title: `GitHub snapshot synced: ${snapshot.owner}/${snapshot.repo}`,
+        description: `Updated documentation snapshot to commit ${snapshot.commitSha.slice(0, 12)}.`,
+        actor: activeActor, sourceId: source.id,
+      };
+      setActivity((previous) => [event, ...previous]);
+      if (activeWorkspaceId) await appendWorkspaceActivity(activeWorkspaceId, event);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'GitHub synchronization failed.');
+      throw error;
+    }
   };
 
   // Handle deleting a source (cascades deletion of claims)
   const handleDeleteSource = async (sourceId: string) => {
     const target = sources.find((s) => s.id === sourceId);
 
-    // Delete in IndexedDB
+    // Delete only within the active persistence boundary.
     try {
-      await deleteStoredSource(sourceId);
+      if (activeWorkspaceId) await deleteWorkspaceSource(activeWorkspaceId, sourceId);
+      else await deleteStoredSource(sourceId);
     } catch (err) {
-      console.warn('Error deleting stored source:', err);
+      console.error('Error deleting source from workspace persistence:', err);
+      throw err;
     }
 
-    // Clean up in-memory state
+    // Only update in-memory state after persistent deletion succeeds.
     setSources((prev) => prev.filter((s) => s.id !== sourceId));
     setClaims((prev) => prev.filter((c) => c.sourceId !== sourceId));
 
@@ -444,18 +614,32 @@ export default function App() {
     }
   };
 
-  // Reset sample data
+  // Reset only the isolated Judge Demo namespace and restore the original sample state.
   const handleResetSampleData = async () => {
+    if (activeWorkspaceId) {
+      alert('Sample data reset is disabled in authenticated workspaces. Your shared team data has not been changed.');
+      return;
+    }
+
     try {
-      const stored = await getAllStoredSources();
-      setSources([...stored, ...INITIAL_SOURCES]);
-      const storedClaims = await getAllStoredClaims();
-      setClaims([...storedClaims, ...INITIAL_CLAIMS]);
-    } catch {
+      await clearJudgeDemoPersistence();
       setSources(INITIAL_SOURCES);
       setClaims(INITIAL_CLAIMS);
+      setConflicts(INITIAL_CONFLICTS);
+      setMissingInfo(INITIAL_MISSING_INFO);
+      setQuestions(INITIAL_QUESTIONS);
+      setActivity(SAMPLE_ACTIVITY);
+      setInspectingClaim(null);
+      setInspectingSource(null);
+      setReconstructingSource(null);
+      setIsReconstructModalOpen(false);
+      setIsConnectModalOpen(false);
+      setLedgerSourceFilter('all');
+      alert('Judge Demo sample data has been restored. Your normal ProjectVault workspace data was not changed.');
+    } catch (error) {
+      console.error('Judge Demo reset failed:', error);
+      alert('Judge Demo could not be reset. No success was reported; please retry after checking browser storage permissions.');
     }
-    setActivity(SAMPLE_ACTIVITY);
   };
 
   // Header primary action router
@@ -476,6 +660,9 @@ export default function App() {
       case 'handover':
         // Trigger export action or scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        break;
+      case 'graph':
+        setIsConnectModalOpen(true);
         break;
       case 'settings':
         alert('Settings configuration saved for active session.');
@@ -503,8 +690,10 @@ export default function App() {
           setCurrentPage(page);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        workspaces={SAMPLE_WORKSPACES}
+        workspaces={activeWorkspaceId ? [currentWorkspace] : SAMPLE_WORKSPACES}
         currentWorkspace={currentWorkspace}
+        isDemoWorkspace={!cloud}
+        activeActor={activeActor}
         onSelectWorkspace={(ws) => setCurrentWorkspace(ws)}
         unverifiedCount={unverifiedCount}
         conflictedCount={conflictedCount}
@@ -518,6 +707,7 @@ export default function App() {
         <Header
           currentPage={currentPage}
           currentWorkspace={currentWorkspace}
+          isDemoWorkspace={!cloud}
           onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
           onPrimaryAction={handlePrimaryAction}
           onNavigate={(page) => setCurrentPage(page)}
@@ -528,6 +718,7 @@ export default function App() {
           {currentPage === 'overview' && (
             <OverviewPage
               currentWorkspace={currentWorkspace}
+              isDemoWorkspace={!cloud}
               workflowStages={WORKFLOW_STAGES}
               sources={sources}
               claims={claims}
@@ -560,6 +751,15 @@ export default function App() {
               onNavigateToReview={() => setCurrentPage('review')}
               onNavigateToSources={() => setCurrentPage('sources')}
               onToggleFlagClaim={handleToggleFlagClaim}
+            />
+          )}
+
+          {currentPage === 'graph' && (
+            <KnowledgeGraphPage
+              sources={sources}
+              claims={claims}
+              conflicts={conflicts}
+              onInspectClaim={(claim) => setInspectingClaim(claim)}
             />
           )}
 
@@ -605,6 +805,7 @@ export default function App() {
             <SettingsPage
               currentWorkspace={currentWorkspace}
               onResetSampleData={handleResetSampleData}
+              session={cloud?.session ?? null}
             />
           )}
         </main>
@@ -631,6 +832,7 @@ export default function App() {
         onNavigateToLedger={() => handleNavigateToLedgerFiltered(inspectingSource?.id)}
         onDeleteSource={handleDeleteSource}
         onReconstructSource={handleOpenReconstructModal}
+        onSyncGitHubSource={handleSyncGitHubSource}
       />
 
       {/* Reconstruct Knowledge Modal (Gemini 3.8 Flash) */}

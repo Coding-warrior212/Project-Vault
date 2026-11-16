@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   ExternalLink,
+  Network,
 } from 'lucide-react';
 
 import { Vault3DLogo } from '../common/Soft3DVisuals';
@@ -24,6 +25,8 @@ interface SidebarProps {
   onNavigate: (page: AppPage) => void;
   workspaces: Workspace[];
   currentWorkspace: Workspace;
+  isDemoWorkspace: boolean;
+  activeActor: string;
   onSelectWorkspace: (workspace: Workspace) => void;
   unverifiedCount: number;
   conflictedCount: number;
@@ -37,6 +40,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
   workspaces,
   currentWorkspace,
+  isDemoWorkspace,
+  activeActor,
   onSelectWorkspace,
   unverifiedCount,
   conflictedCount,
@@ -78,6 +83,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'ledger' as AppPage,
       label: 'Knowledge Ledger',
       icon: FileSpreadsheet,
+      badge: null,
+    },
+    {
+      id: 'graph' as AppPage,
+      label: 'Knowledge Graph',
+      icon: Network,
       badge: null,
     },
     {
@@ -300,13 +311,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 case 'ledger':
                   return { step: 3, name: 'VERIFY', label: 'Stage 3 / 5' };
                 case 'review':
-                  return { step: 4, name: 'REVIEW', label: 'Stage 4 / 5' };
+                  return isDemoWorkspace
+                    ? { step: 4, name: 'REVIEW', label: 'Stage 4 / 5' }
+                    : sourcesCount > 0
+                      ? { step: 2, name: 'RECONSTRUCT', label: 'Stage 2 / 5' }
+                      : { step: 1, name: 'CONNECT', label: 'Stage 1 / 5' };
                 case 'handover':
                   return { step: 5, name: 'HANDOVER', label: 'Stage 5 / 5' };
                 case 'overview':
                 case 'settings':
                 default:
-                  return { step: 4, name: 'REVIEW', label: 'Stage 4 / 5' };
+                  if (isDemoWorkspace) return { step: 4, name: 'REVIEW', label: 'Stage 4 / 5' };
+                  return sourcesCount > 0
+                    ? { step: 2, name: 'RECONSTRUCT', label: 'Stage 2 / 5' }
+                    : { step: 1, name: 'CONNECT', label: 'Stage 1 / 5' };
               }
             };
             const currentStage = getStage(currentPage);
@@ -374,14 +392,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 border-2 border-white/15 shadow-[2px_2px_0px_rgba(0,0,0,0.2)]">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#55C7C2] to-[#FFF4E3] text-[#25245F] font-bold text-xs flex items-center justify-center shrink-0 border border-[#25245F]">
-                ER
+                {isDemoWorkspace ? 'ER' : activeActor.slice(0, 2).toUpperCase()}
               </div>
               <div className="min-w-0">
                 <div className="text-xs font-medium text-white truncate">
-                  Elena Rostova
+                  {activeActor}
                 </div>
                 <div className="text-[10px] text-white/50 truncate">
-                  Principal Architect
+                  {isDemoWorkspace ? 'Principal Architect' : currentWorkspace.role}
                 </div>
               </div>
             </div>

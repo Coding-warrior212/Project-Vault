@@ -24,12 +24,13 @@ import {
 } from 'lucide-react';
 import { extractKnowledgeFromSource, ReconstructResult } from '../../services/reconstruct';
 import { SourceType3DGlyph } from '../common/Soft3DVisuals';
+import { useWorkspaceSession } from '../auth/WorkspaceSessionContext';
 
 interface ReconstructModalProps {
   source: Source | null;
   isOpen: boolean;
   onClose: () => void;
-  onClaimsExtracted: (sourceId: string, claims: KnowledgeClaim[], updatedSource: Source) => void;
+  onClaimsExtracted: (sourceId: string, claims: KnowledgeClaim[], updatedSource: Source) => Promise<{ insertedCount: number; totalCount: number }>;
   onNavigateToLedger: (sourceId?: string) => void;
   onInspectClaim?: (claim: KnowledgeClaim) => void;
 }
@@ -42,6 +43,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
   onNavigateToLedger,
   onInspectClaim,
 }) => {
+  const cloud = useWorkspaceSession();
   const [status, setStatus] = React.useState<
     'idle' | 'preparing' | 'sending' | 'analyzing' | 'validating' | 'persisting' | 'completed' | 'error'
   >('idle');
@@ -49,6 +51,10 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
   const [statusMessage, setStatusMessage] = React.useState<string>('');
   const [result, setResult] = React.useState<ReconstructResult | null>(null);
   const [isReprocessing, setIsReprocessing] = React.useState<boolean>(false);
+  const [pendingPersistence, setPendingPersistence] = React.useState<{
+    result: ReconstructResult;
+    updatedSource: Source;
+  } | null>(null);
 
   React.useEffect(() => {
     if (isOpen && source) {
@@ -58,34 +64,155 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
       setProgressPercent(0);
       setStatusMessage('');
       setResult(null);
+      setPendingPersistence(null);
     }
   }, [isOpen, source?.id]);
 
   if (!isOpen || !source) return null;
 
+  const hasWorkspaceAccess = Boolean(
+    cloud?.workspace?.id && cloud?.session?.access_token
+  );
+
   const handleStartExtraction = async () => {
+    if (!hasWorkspaceAccess || !cloud) {
+      setStatus('error');
+      setStatusMessage('Sign in to an authorized workspace before starting AI reconstruction.');
+      setResult({
+        success: false,
+        sourceId: source.id,
+        sourceName: source.filename,
+        claims: [],
+        extractedCount: 0,
+        groundedCount: 0,
+        error: 'An authenticated workspace session is required.',
+        isAuth: true,
+      });
+      return;
+    }
+
     setStatus('preparing');
-    setProgressPercent(10);
-    setStatusMessage('Initiating knowledge reconstruction engine...');
+    setProgressPercent(5);
+    setStatusMessage('Preparing secure workspace reconstruction...');
     setResult(null);
+    setPendingPersistence(null);
 
-    const res = await extractKnowledgeFromSource(source, (stage, message, progress) => {
-      setStatus(stage);
-      setStatusMessage(message);
-      setProgressPercent(progress);
-    });
+    let extractedForPersistence: {
+      result: ReconstructResult;
+      updatedSource: Source;
+    } | null = null;
 
-    setResult(res);
+    try {
+      const res = await extractKnowledgeFromSource(
+        source,
+        (stage, message, progress) => {
+          if (stage !== 'completed') setStatus(stage);
+          setStatusMessage(message);
+          setProgressPercent(progress);
+        },
+        {
+          workspaceId: cloud.workspace.id,
+          accessToken: cloud.session.access_token,
+        }
+      );
 
-    if (res.success) {
+      if (!res.success) {
+        setResult(res);
+        setStatus('error');
+        return;
+      }
+
+      setStatus('persisting');
+      setProgressPercent(92);
+      setStatusMessage('Saving evidence-grounded claims to your workspace...');
+
       const updatedSource: Source = {
         ...source,
-        claimsCount: res.claims.length,
+        claimsCount: source.claimsCount + res.claims.length,
         reconstructStatus: 'completed',
         reconstructedAt: new Date().toISOString(),
         summary: res.summary || source.summary,
       };
-      onClaimsExtracted(source.id, res.claims, updatedSource);
+
+      extractedForPersistence = { result: res, updatedSource };
+      setPendingPersistence(extractedForPersistence);
+
+      const persistence = await onClaimsExtracted(source.id, res.claims, updatedSource);
+
+      setPendingPersistence(null);
+      setResult(res);
+      setProgressPercent(100);
+      setStatusMessage(
+        `Saved ${persistence.insertedCount} new claims. ${persistence.totalCount} claims now exist for this source.`
+      );
+      setStatus('completed');
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : 'Knowledge extraction or workspace persistence failed.';
+
+      if (extractedForPersistence) {
+        const recoveryMessage =
+          `Extraction produced ${extractedForPersistence.result.extractedCount} claims, ` +
+          `but workspace saving did not complete. Some claims may already be saved. ${message}`;
+
+        setResult({
+          ...extractedForPersistence.result,
+          success: false,
+          error: recoveryMessage,
+        });
+        setStatusMessage(recoveryMessage);
+      } else {
+        setResult({
+          success: false,
+          sourceId: source.id,
+          sourceName: source.filename,
+          claims: [],
+          extractedCount: 0,
+          groundedCount: 0,
+          error: message,
+        });
+        setStatusMessage(message);
+      }
+
+      setStatus('error');
+    }
+  };
+
+  const handleRetryPersistence = async () => {
+    if (!pendingPersistence) return;
+
+    const pending = pendingPersistence;
+    setStatus('persisting');
+    setProgressPercent(92);
+    setStatusMessage('Retrying workspace save with the previously extracted claims...');
+
+    try {
+      const persistence = await onClaimsExtracted(
+        pending.updatedSource.id,
+        pending.result.claims,
+        pending.updatedSource,
+      );
+
+      setPendingPersistence(null);
+      setResult(pending.result);
+      setProgressPercent(100);
+      setStatusMessage(
+        `Saved ${persistence.insertedCount} new claims. ${persistence.totalCount} claims now exist for this source.`
+      );
+      setStatus('completed');
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : 'Workspace persistence failed again.';
+
+      setResult({
+        ...pending.result,
+        success: false,
+        error: `The extracted claims are retained. Workspace save retry failed: ${message}`,
+      });
+      setStatusMessage(message);
+      setStatus('error');
     }
   };
 
@@ -104,7 +231,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
                   Stage 2 · RECONSTRUCT
                 </span>
                 <span className="text-[10px] font-mono font-bold text-[#F36B3F] bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded border border-orange-200 dark:border-orange-900/40">
-                  Gemini 3.8 Flash
+                  SECURE AI RECONSTRUCTION
                 </span>
               </div>
               <h2 className="text-base font-bold text-neutral-900 dark:text-[#FFF4E3] mt-0.5">
@@ -164,7 +291,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
               <div className="space-y-1">
                 <p className="font-bold">Controlled Source Reprocessing</p>
                 <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
-                  This document previously generated {source.claimsCount} claims. Re-running reconstruction will cleanly replace previous claims for this source with fresh, verified evidence assertions. No orphaned or duplicate records will be created.
+                  This document already has {source.claimsCount} claims. A new extraction will add another set of claims. Existing claims, human reviews, and conflict references will be preserved; review the new claims for duplicates before relying on them.
                 </p>
               </div>
             </div>
@@ -178,7 +305,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
                 Evidence Traceability & Untrusted Data Safeguard
               </span>
               <p className="text-[11px] text-neutral-600 dark:text-[#C4C3E0] leading-relaxed">
-                Document text is sent to Gemini as passive data through our secure server gateway. Every extracted claim is required to be substantiated by an exact verbatim quote and page/line locator. All newly synthesized claims enter the Knowledge Ledger marked <strong className="font-semibold text-amber-700 dark:text-amber-300">UNVERIFIED</strong> for human review.
+                Source text is read by the authenticated server from your authorized workspace. The server validates extracted quotations against the stored source text. AI-generated claims begin as unverified and still require human review.
               </p>
             </div>
           </div>
@@ -191,18 +318,23 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
               </div>
               <div className="max-w-md mx-auto space-y-1">
                 <h4 className="font-bold text-neutral-900 dark:text-[#FFF4E3] text-sm">
-                  Ready to Reconstruct Knowledge
+                  Ready to Reconstruct Project Knowledge
                 </h4>
                 <p className="text-xs text-neutral-500 dark:text-[#8E8DAF] leading-relaxed">
-                  Gemini 3.8 Flash will inspect architectural decisions, technical specifications, system components, action items, risks, and operational parameters.
+                  {hasWorkspaceAccess
+                    ? 'Gemini will analyze the source stored in your authorized workspace and return claims anchored to matching source quotations.'
+                    : 'Sign in to an authorized workspace to enable secure server-side AI reconstruction. Existing claims remain available for review.'}
                 </p>
               </div>
               <button
+                type="button"
                 onClick={handleStartExtraction}
-                className="px-6 py-2.5 text-xs font-bold text-white bg-[#F36B3F] hover:bg-[#E0572C] rounded-lg border-2 border-[#F36B3F] shadow-[3px_3px_0px_#25245F] dark:shadow-[3px_3px_0px_#55C7C2] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer inline-flex items-center gap-2"
+                disabled={!hasWorkspaceAccess}
+                title={hasWorkspaceAccess ? 'Start secure AI knowledge extraction' : 'Sign in to an authorized workspace first'}
+                className="px-6 py-2.5 text-xs font-bold text-white bg-[#F36B3F] hover:bg-[#E0572C] disabled:text-neutral-500 disabled:bg-neutral-200 dark:disabled:bg-[#25245F] rounded-lg border-2 border-[#F36B3F] disabled:border-neutral-300 dark:disabled:border-[#2D2C68] cursor-pointer disabled:cursor-not-allowed inline-flex items-center gap-2"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>{isReprocessing ? 'Start Reprocessing Source' : 'Reconstruct Knowledge Claims'}</span>
+                <span>{hasWorkspaceAccess ? 'Start Knowledge Extraction' : 'Workspace Sign-in Required'}</span>
               </button>
             </div>
           )}
@@ -214,7 +346,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
                 <div className="flex items-center gap-2.5">
                   <div className="w-6 h-6 rounded-full border-2 border-[#F36B3F] border-t-transparent animate-spin" />
                   <span className="font-bold text-neutral-900 dark:text-[#FFF4E3] text-xs">
-                    Reconstructing Knowledge with Gemini...
+                    Secure AI reconstruction in progress
                   </span>
                 </div>
                 <span className="font-mono text-xs font-bold text-[#F36B3F]">{progressPercent}%</span>
@@ -247,16 +379,22 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
                   <p className="text-xs text-rose-800 dark:text-rose-300 leading-relaxed">
                     {result?.error || statusMessage || 'Could not complete knowledge extraction from this source.'}
                   </p>
+                  {pendingPersistence && (
+                    <p className="text-xs text-rose-800 dark:text-rose-300 leading-relaxed">
+                      {pendingPersistence.result.extractedCount} extracted claims are retained.
+                      Retry Save will reuse this exact batch without calling Gemini again.
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-rose-200 dark:border-rose-900/60">
                 <button
-                  onClick={handleStartExtraction}
+                  onClick={pendingPersistence ? handleRetryPersistence : handleStartExtraction}
                   className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Retry Extraction</span>
+                  <span>{pendingPersistence ? 'Retry Save' : 'Retry Extraction'}</span>
                 </button>
               </div>
             </div>
@@ -275,7 +413,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
                       Reconstruction Succeeded
                     </h4>
                     <p className="text-[11px] text-emerald-700 dark:text-emerald-300">
-                      Extracted {result.extractedCount} atomic claims ({result.groundedCount} directly anchored to verbatim citations). Stored in IndexedDB.
+                      Extracted {result.extractedCount} atomic claims ({result.groundedCount} directly anchored to verbatim citations). Saved to your workspace.
                     </p>
                   </div>
                 </div>
@@ -351,7 +489,7 @@ export const ReconstructModal: React.FC<ReconstructModalProps> = ({
         <div className="p-4 border-t-2 border-neutral-200 dark:border-[#2D2C68] flex items-center justify-between bg-neutral-50/70 dark:bg-[#14133B]/60">
           <div className="text-xs text-neutral-500 dark:text-[#8E8DAF] flex items-center gap-1.5">
             <Cpu className="w-3.5 h-3.5 text-[#55C7C2]" />
-            <span>AI Studio Engine · Model: gemini-2.5-flash</span>
+            <span>Gemini 3.8 Flash · Workspace-authorized</span>
           </div>
 
           <div className="flex items-center gap-2">

@@ -1,4 +1,4 @@
-export type AppPage = 'overview' | 'sources' | 'ledger' | 'review' | 'handover' | 'settings';
+export type AppPage = 'overview' | 'sources' | 'ledger' | 'review' | 'handover' | 'graph' | 'settings';
 
 export type WorkflowStageId = 'CONNECT' | 'RECONSTRUCT' | 'VERIFY' | 'REVIEW' | 'HANDOVER';
 
@@ -40,6 +40,11 @@ export interface Source {
   reconstructedAt?: string;
   author: string;
   repoBranch?: string;
+  githubOwner?: string;
+  githubRepo?: string;
+  githubUrl?: string;
+  commitSha?: string;
+  lastSyncedAt?: string;
   summary: string;
   rawExcerpt: string;
   extractedText?: string;
@@ -128,7 +133,7 @@ export interface KnowledgeClaim {
 
 export interface ActivityEvent {
   id: string;
-  type: 'source_ingested' | 'claim_verified' | 'conflict_detected' | 'handover_drafted' | 'claim_rejected' | 'knowledge_reconstructed' | 'claim_flagged' | 'claim_unflagged';
+  type: 'source_ingested' | 'claim_verified' | 'conflict_detected' | 'handover_drafted' | 'handover_approved' | 'handover_invalidated' | 'claim_rejected' | 'knowledge_reconstructed' | 'claim_flagged' | 'claim_unflagged' | 'member_joined' | 'member_role_changed' | 'member_removed' | 'ownership_transferred' | 'github_synced' | 'graph_rebuilt';
   timestamp: string;
   title: string;
   description: string;

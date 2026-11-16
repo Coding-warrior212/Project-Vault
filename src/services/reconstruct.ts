@@ -4,7 +4,6 @@
  */
 
 import { Source, KnowledgeClaim } from '../types';
-import { saveStoredClaims, deleteStoredClaimsBySourceId, saveStoredSource } from './db';
 
 export interface ExtractionProgressCallback {
   (stage: 'preparing' | 'sending' | 'analyzing' | 'validating' | 'persisting' | 'completed' | 'error', message: string, progress: number): void;
@@ -45,7 +44,8 @@ const inFlightExtractions = new Set<string>();
  */
 export async function extractKnowledgeFromSource(
   source: Source,
-  onProgress?: ExtractionProgressCallback
+  onProgress?: ExtractionProgressCallback,
+  workspace?: { workspaceId: string; accessToken: string }
 ): Promise<ReconstructResult> {
   if (inFlightExtractions.has(source.id)) {
     onProgress?.('error', 'Extraction for this source is already in progress.', 0);
@@ -62,11 +62,10 @@ export async function extractKnowledgeFromSource(
 
   inFlightExtractions.add(source.id);
 
-  const textToAnalyze = source.extractedText || source.rawExcerpt || '';
-
-  if (!textToAnalyze || textToAnalyze.trim().length === 0) {
+  if (!workspace?.workspaceId || !workspace.accessToken) {
     inFlightExtractions.delete(source.id);
-    onProgress?.('error', 'Source contains no extracted text to reconstruct.', 0);
+    const error = 'AI reconstruction requires a signed-in workspace.';
+    onProgress?.('error', error, 0);
     return {
       success: false,
       sourceId: source.id,
@@ -74,12 +73,13 @@ export async function extractKnowledgeFromSource(
       claims: [],
       extractedCount: 0,
       groundedCount: 0,
-      error: 'Source document has no extractable text content.',
+      error,
+      isAuth: true,
     };
   }
 
   try {
-    onProgress?.('preparing', `Preparing ${source.filename} (${(source.charCount || textToAnalyze.length).toLocaleString()} chars)...`, 15);
+    onProgress?.('preparing', `Preparing secure reconstruction for ${source.filename}...`, 15);
 
     // Short artificial delay for smooth UX transition
     await new Promise((r) => setTimeout(r, 200));
@@ -87,19 +87,17 @@ export async function extractKnowledgeFromSource(
     onProgress?.('sending', 'Submitting document context to secure server-side Gemini gateway...', 35);
 
     const payload = {
+      workspaceId: workspace.workspaceId,
       sourceId: source.id,
-      sourceName: source.filename,
-      fileType: source.type,
-      text: textToAnalyze,
-      pages: source.pages?.map((p) => ({ pageNumber: p.pageNumber, text: p.text })),
     };
 
-    onProgress?.('analyzing', 'Gemini 2.5 Flash analyzing architectural commitments & facts...', 55);
+    onProgress?.('analyzing', 'Gemini 3.8 Flash analyzing architectural commitments & facts...', 55);
 
     const res = await fetch('/api/gemini/extract-knowledge', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${workspace.accessToken}`,
       },
       body: JSON.stringify(payload),
     });
@@ -129,29 +127,33 @@ export async function extractKnowledgeFromSource(
       };
     }
 
-    onProgress?.('validating', `Verifying ${data.claims.length} claims against source citations and locators...`, 80);
+    if (!Array.isArray(data.claims)) {
+      throw new Error('The extraction service returned an invalid claims list.');
+    }
 
-    const claims: KnowledgeClaim[] = data.claims || [];
+    const claims = data.claims as KnowledgeClaim[];
+    const malformedClaim = claims.some((claim) =>
+      !claim ||
+      typeof claim.id !== 'string' ||
+      typeof claim.statement !== 'string' ||
+      typeof claim.sourceId !== 'string' ||
+      claim.sourceId !== source.id ||
+      typeof claim.sourceName !== 'string' ||
+      typeof claim.sourceEvidenceQuote !== 'string' ||
+      typeof claim.category !== 'string' ||
+      typeof claim.confidenceScore !== 'number' ||
+      typeof claim.confidenceTier !== 'string' ||
+      typeof claim.verificationStatus !== 'string' ||
+      typeof claim.importance !== 'string'
+    );
 
-    onProgress?.('persisting', 'Persisting reconstructed claims into browser-side IndexedDB...', 92);
+    if (malformedClaim) {
+      throw new Error('The extraction service returned malformed or mismatched claim data.');
+    }
 
-    // Remove previous claims for this source to prevent duplicate pollution upon reprocessing
-    await deleteStoredClaimsBySourceId(source.id);
+    onProgress?.('validating', `Verifying ${claims.length} claims against source citations and locators...`, 80);
 
-    // Save newly reconstructed claims
-    await saveStoredClaims(claims);
-
-    // Update source's claimsCount and reconstructStatus
-    const updatedSource: Source = {
-      ...source,
-      claimsCount: claims.length,
-      reconstructStatus: 'completed',
-      reconstructedAt: new Date().toISOString(),
-      summary: data.summary || source.summary,
-    };
-    await saveStoredSource(updatedSource);
-
-    onProgress?.('completed', `Successfully reconstructed ${claims.length} evidence-grounded claims!`, 100);
+    onProgress?.('persisting', 'Preparing reconstructed claims for workspace-scoped persistence...', 92);
 
     return {
       success: true,

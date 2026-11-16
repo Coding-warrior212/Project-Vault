@@ -41,6 +41,9 @@ import {
   Square,
 } from 'lucide-react';
 import { HandoverDossier3D } from '../common/Soft3DVisuals';
+import { useWorkspaceSession } from '../auth/WorkspaceSessionContext';
+import { loadWorkspaceHandover, saveWorkspaceHandover, subscribeWorkspaceChanges } from '../../services/workspaceCloud';
+import { getScopedLocalStorageKey } from '../../services/db';
 
 interface HandoverPageProps {
   currentWorkspace: Workspace;
@@ -63,19 +66,20 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
   onNavigateToReview,
   onNavigateToLedger,
 }) => {
+  const cloud = useWorkspaceSession();
   const [showExportModal, setShowExportModal] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [exportFormat, setExportFormat] = React.useState<'markdown' | 'executive'>('markdown');
 
   // Reviewer notes & signoff state persisted in localStorage
   const [executiveNote, setExecutiveNote] = React.useState<string>(() => {
-    return localStorage.getItem('projectvault_handover_exec_note') || HANDOVER_TEMPLATE.summary;
+    return cloud ? HANDOVER_TEMPLATE.summary : (localStorage.getItem(getScopedLocalStorageKey('projectvault_handover_exec_note')) || HANDOVER_TEMPLATE.summary);
   });
   const [approverName, setApproverName] = React.useState<string>(() => {
-    return localStorage.getItem('projectvault_handover_approver') || '';
+    return cloud ? '' : (localStorage.getItem(getScopedLocalStorageKey('projectvault_handover_approver')) || '');
   });
   const [finalComment, setFinalComment] = React.useState<string>(() => {
-    return localStorage.getItem('projectvault_handover_comment') || '';
+    return cloud ? '' : (localStorage.getItem(getScopedLocalStorageKey('projectvault_handover_comment')) || '');
   });
 
   // Approval checklist state
@@ -90,18 +94,47 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
   const [approvalError, setApprovalError] = React.useState<string | null>(null);
 
   const [isApproved, setIsApproved] = React.useState<boolean>(() => {
-    const persistedApproved = localStorage.getItem('projectvault_handover_approved') === 'true';
-    const persistedApprover = localStorage.getItem('projectvault_handover_approver') || '';
-    return persistedApproved && persistedApprover.trim().length > 0;
+    const persistedApproved = localStorage.getItem(getScopedLocalStorageKey('projectvault_handover_approved')) === 'true';
+    const persistedApprover = localStorage.getItem(getScopedLocalStorageKey('projectvault_handover_approver')) || '';
+    return !cloud && persistedApproved && persistedApprover.trim().length > 0;
   });
+
+  React.useEffect(() => {
+    if (!cloud) return;
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+    const refresh = async () => {
+      const record = await loadWorkspaceHandover(cloud.workspace.id);
+      if (!active || !record) return;
+      setExecutiveNote(record.executiveNote || HANDOVER_TEMPLATE.summary);
+      setApproverName(record.approvedBy || '');
+      setFinalComment(record.finalComment || '');
+      setChecklist({
+        verified: Boolean(record.checklist.verified), unverified: Boolean(record.checklist.unverified),
+        conflicts: Boolean(record.checklist.conflicts), missing: Boolean(record.checklist.missing),
+        evidence: Boolean(record.checklist.evidence),
+      });
+      setIsApproved(record.isApproved);
+    };
+    void refresh().then(() => {
+      if (active) unsubscribe = subscribeWorkspaceChanges(cloud.workspace.id, () => {
+        void refresh().catch((error) => console.error('Realtime handover refresh failed:', error));
+      }, 'handover');
+    }).catch((error) => {
+      console.error('Handover load failed:', error);
+      if (active) setApprovalError('Shared handover state could not be loaded. Please retry before approving.');
+    });
+    return () => { active = false; unsubscribe?.(); };
+  }, [cloud?.workspace.id]);
+
 
   // Handle changes that invalidate prior approval
   const handleNoteChange = (setter: React.Dispatch<React.SetStateAction<string>>, storageKey: string, val: string) => {
     setter(val);
-    localStorage.setItem(storageKey, val);
+    if (!cloud) localStorage.setItem(getScopedLocalStorageKey(storageKey), val);
     setApprovalError(null);
     setIsApproved(false);
-    localStorage.setItem('projectvault_handover_approved', 'false');
+    if (!cloud) localStorage.setItem(getScopedLocalStorageKey('projectvault_handover_approved'), 'false');
   };
 
   const handleChecklistToggle = (key: keyof typeof checklist) => {
@@ -111,12 +144,12 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
     });
     setApprovalError(null);
     setIsApproved(false);
-    localStorage.setItem('projectvault_handover_approved', 'false');
+    if (!cloud) localStorage.setItem(getScopedLocalStorageKey('projectvault_handover_approved'), 'false');
   };
 
   const allChecklistItemsChecked = Object.values(checklist).every(Boolean);
 
-  const handleApproveHandover = () => {
+  const handleApproveHandover = async () => {
     const trimmedName = approverName.trim();
     if (!trimmedName) {
       setApprovalError('Please enter the Lead Reviewer / Approver Name before signing off.');
@@ -127,8 +160,23 @@ export const HandoverPage: React.FC<HandoverPageProps> = ({
       return;
     }
     setApprovalError(null);
-    setIsApproved(true);
-    localStorage.setItem('projectvault_handover_approved', 'true');
+    try {
+      if (cloud) await saveWorkspaceHandover(cloud.workspace.id, { title: HANDOVER_TEMPLATE.title, executiveNote, finalComment, checklist, isApproved: true, approvedBy: trimmedName });
+      else localStorage.setItem(getScopedLocalStorageKey('projectvault_handover_approved'), 'true');
+      setIsApproved(true);
+    } catch (error) {
+      setApprovalError(error instanceof Error ? error.message : 'The shared handover could not be saved.');
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!cloud) return;
+    try {
+      await saveWorkspaceHandover(cloud.workspace.id, { title: HANDOVER_TEMPLATE.title, executiveNote, finalComment, checklist, isApproved: false, approvedBy: '' });
+      setApprovalError(null);
+    } catch (error) {
+      setApprovalError(error instanceof Error ? error.message : 'The shared handover draft could not be saved.');
+    }
   };
 
   // Filtered categories
@@ -603,6 +651,7 @@ ${
           <p className="text-[11px] text-neutral-500 dark:text-[#8E8DAF] italic">
             Note: Any edits to reviewer notes or executive summaries will invalidate approval and require re-verification.
           </p>
+          {cloud && <button type="button" onClick={handleSaveDraft} className="mr-2 rounded-lg border border-neutral-300 px-3 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 dark:border-[#35337C] dark:text-[#FFF4E3] dark:hover:bg-[#25245F]">Save shared draft</button>}
           <button
             onClick={handleApproveHandover}
             disabled={!allChecklistItemsChecked || approverName.trim().length === 0 || isApproved}
