@@ -63,7 +63,7 @@ No schema, data, Auth provider, Storage, secret, or deployment settings were cha
 ### Verified repository and CI state
 
 - The `round3-development` branch exists and compares to `main` as **203 commits ahead, 0 behind** at review time. This is a branch-history comparison, not a statement that all 203 commits are individually release-ready.
-- PR #1 currently lists **58 changed files**. The review API returned no submitted PR reviews or inline review threads.
+- PR #1 currently lists **60 changed files**. The review API returned no submitted PR reviews or inline review threads.
 - GitHub Actions run [#43758917330](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43758917330) is confirmed complete with both jobs successful: server tests/typecheck/build/Playwright E2E, and all-migrations PostgreSQL 17 validation plus adversarial smoke tests.
 - Two follow-up commits from this review improve Render-aware invite throttling. Their CI result is **pending** at the time of this note; do not reuse the previous green run as evidence for those new commits.
 
@@ -85,3 +85,10 @@ No schema, data, Auth provider, Storage, secret, or deployment settings were cha
 ### Milestone disposition
 
 Milestone 2 remains **OPEN — not signed off**. The green CI run validates the disposable PostgreSQL harness and tested application flows, not managed Supabase/PostgREST/Auth/Storage/Realtime behavior. The newly identified owner-race and membership-revocation checks must be resolved before security sign-off. No user action is required for this review; no hosted migration, merge, or deployment is authorized.
+
+
+### CI follow-up — 2026-11-16
+
+- GitHub Actions run [#43812894268](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43812894268) completed successfully for the Render-aware invite throttling code and regression test. Both application and database jobs passed, including server tests, typecheck, build, Playwright E2E, and the full local PostgreSQL 17 migration/adversarial harness.
+- The subsequent documentation-only branch-head update triggered run [#43813104728](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43813104728). Its database job passed; the application job was still installing Chromium for Playwright when checked. Treat the latest branch head as **CI in progress** until that job completes.
+- PR #1 metadata reports **60 changed files**, is open, draft, unmerged, and mergeable at this check. The branch head is `7abe16baea877ce18564e72e63492011758b2b49`.
