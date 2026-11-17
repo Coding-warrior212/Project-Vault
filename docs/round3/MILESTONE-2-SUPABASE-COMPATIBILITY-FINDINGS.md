@@ -168,3 +168,51 @@ The AuthGate re-queries memberships when session/workspace access is refreshed, 
 ### CI follow-up — 2026-11-16
 
 Run [#43813310350](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43813310350) completed successfully on the current branch head. Both the application and database jobs passed, including server tests, typecheck, build, Chromium Playwright E2E, and the complete local PostgreSQL 17 migration/assertion/adversarial harness. This run includes the Render-aware invite-throttling code and regression test. Wait for the full application job before treating the current branch head as green.
+
+
+## 2026-11-17 review — application integration and owner lifecycle
+
+### Current application integration (verified from the development branch)
+
+The earlier sections above describe earlier development snapshots and are superseded where they say that the app has no Supabase client/Auth UI/cloud persistence or that Gemini endpoints are unauthenticated.
+
+- Browser integration uses `@supabase/supabase-js` with only `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
+- `AuthGate` provides email/password sign-up/sign-in, Google OAuth initiation, password recovery, session restoration, workspace membership lookup, workspace creation, invite redemption, and an isolated interactive local Judge Demo.
+- `workspaceCloud.ts` persists workspace data through the user's Supabase client/JWT and provides private Storage upload/download/delete plus Realtime subscriptions.
+- `server/supabaseInvite.ts` validates sessions through Supabase Auth, derives the user ID from Auth, hashes invite codes server-side, and calls the service-role-only redemption RPC with the server-only secret key.
+- `server/geminiAuth.ts` validates the session with `auth.getUser`, checks membership through the user's JWT/RLS, and enforces route-specific roles. The guard now requires `is_anonymous === false`; the new unit test is included in `npm run test:server`.
+- The Gemini routes read source/claim data with the user's JWT. Availability still depends on the server-side Gemini key and managed-backend behavior; no live route verification was performed in this run.
+
+### Storage object lifecycle clarified
+
+The current upload code uses a random UUID in every object path and `upsert: false`. A replacement is uploaded as a new object key and a new `source_files` metadata row; downloads select the newest metadata row, while source deletion removes all associated object paths. The SQL UPDATE policy that denies same-key updates therefore does not block the implemented upload/replacement path. Same-key upsert remains unsupported by design. Real Storage API behavior and cleanup failure handling still need managed testing.
+
+### Last-owner race mitigation committed
+
+Static review confirmed that the previous membership DELETE policy allowed an owner to delete their own owner row, while the AFTER trigger only counted remaining owners. The new migration `20261117110000_require_atomic_owner_membership_changes.sql` closes the direct owner DELETE path in both RLS and the membership trigger. Owner changes must use the capability-gated ownership-transfer RPC, which locks membership rows in a deterministic order; workspace deletion uses its dedicated capability.
+
+The schema assertions and local smoke tests now cover:
+1. RLS denial of direct owner self-deletion;
+2. trigger denial when a privileged SQL role attempts a direct owner delete without the atomic capability;
+3. successful atomic transfer and demotion of the previous owner; and
+4. former-owner departure after transfer while the new owner remains.
+
+These tests are committed but require a fresh CI result. They do not replace a managed two-session/PostgREST concurrency test.
+
+### Membership-revocation client handling
+
+The main-branch AuthGate fix has been backported to the development branch. A membership lookup failure now clears the selected workspace, and a Realtime event on the current user's `workspace_members` rows triggers a fresh membership lookup. This improves stale UI state handling; delivery of membership DELETE events under managed Realtime/RLS remains unverified.
+
+### Migration-history discrepancy and hosted-state limitation
+
+At the start of this review, the development repository contained ten migration files. PR #1's current description and the submission draft report eleven hosted migrations, including a follow-up security-permissions migration that is not identifiable among those ten files. This review adds an owner-guard migration, but it is not that previously reported security-permissions migration. Do not infer that the hosted history is reconciled from migration counts alone.
+
+The 2026-11-15 read-only snapshot reported zero hosted application tables and zero migration records. Later PR/release notes report fourteen tables and eleven migrations. The Supabase skill was not available from the connected skill registry in this run, so no current hosted Supabase calls were made. Current hosted state, migration history, table/RLS state, advisors, Auth, Storage and Realtime must be treated as **unverified**.
+
+### Verification status
+
+- Development branch head before today's changes: `7d0360f8f949ae27bba40b0c1afc6450eef8a260`.
+- Branch run [#43813583777](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43813583777) passed both jobs before today's new migration/tests/Auth changes.
+- Submission-preparation run [#43880847494](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43880847494) has both jobs recorded as successful.
+- The owner-guard migration, AuthGate backport, strict Gemini identity test and updated docs need a new CI run.
+- Milestone 2 remains **OPEN — not signed off**. No hosted migration, deployment, merge, secret change or paid service was used.
