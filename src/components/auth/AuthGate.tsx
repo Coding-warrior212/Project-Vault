@@ -197,12 +197,18 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
     if (!supabase) return;
     setBusy(true);
     setError('');
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin },
-    });
-    if (oauthError) {
-      setError(oauthError.message);
+    setMessage('');
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      });
+      if (oauthError) throw oauthError;
+    } catch (oauthError) {
+      console.error('[ProjectVault Auth] Google sign-in failed:', oauthError);
+      setError(oauthError instanceof Error
+        ? oauthError.message
+        : 'Google sign-in could not be started. Please try again.');
       setBusy(false);
     }
   };
