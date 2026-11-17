@@ -36,7 +36,7 @@ Run with actual Supabase JWTs and role contexts. Do not treat SQL Editor's postg
 9. invite redemption is tested for invalid hash, expiry, revocation, max uses, replay, already-member idempotency, and concurrent redemption at the max-use boundary.
 10. cross-workspace source/claim/node references fail.
 11. activity_events UPDATE/DELETE fail; actor attribution from trusted RPCs matches the capability actor.
-12. last-owner demotion/removal race is stress-tested with two concurrent sessions.
+12. direct owner membership deletion is denied; atomic ownership transfer and former-owner departure are tested locally. A managed two-session concurrency test remains required.
 13. Storage upload/download/delete is tested for all roles and demo workspace.
 14. realtime subscription visibility is tested for members and non-members.
 
@@ -81,3 +81,8 @@ The local adversarial smoke script also tests that a one-use invite can be retri
 ## Append-only activity reference migration
 
 The migration set removes `ON DELETE SET NULL` foreign keys from activity-event source, claim, and Auth-user identifiers. Those automatic updates conflict with the append-only activity trigger. Historical identifiers remain in the audit row after the related operational record or Auth user is deleted. A BEFORE INSERT trigger validates that any new source/claim reference belongs to the event's workspace. The schema assertions require this trigger and verify that the incompatible foreign keys are absent.
+
+
+## Atomic owner membership changes
+
+Migration `20261117110000_require_atomic_owner_membership_changes.sql` denies direct deletion of owner membership rows through both RLS and the membership trigger. Ownership changes must use `transfer_workspace_ownership_atomic`; workspace deletion uses `delete_workspace_atomic`. The local smoke test verifies RLS denial, trigger denial under RLS bypass, successful transfer, and former-owner departure. This does not replace a managed Supabase/PostgREST concurrency test.
