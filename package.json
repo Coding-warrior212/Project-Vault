@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test:server": "node --import tsx --test server/supabaseInvite.test.ts src/services/githubSnapshot.test.ts src/services/db.test.ts",
+    "test:server": "node --import tsx --test server/supabaseInvite.test.ts server/geminiAuth.test.ts src/services/githubSnapshot.test.ts src/services/db.test.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {
