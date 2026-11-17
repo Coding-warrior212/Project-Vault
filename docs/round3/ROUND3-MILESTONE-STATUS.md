@@ -1,6 +1,6 @@
 # ProjectVault Round 3 — Milestone Status
 
-**Snapshot:** 2026-11-15
+**Snapshot:** 2026-11-17
 **Repository:** `Coding-warrior212/Project-Vault`  
 **Working branch:** `round3-development`  
 **Release constraints:** free-only; preserve `main` and the hosted Supabase project until explicit release approval.
@@ -9,22 +9,22 @@
 
 The development branch has advanced beyond the earlier authentication-only snapshot. It now contains browser Supabase Auth UI, a workspace-scoped cloud data adapter, private Storage upload/download/delete paths, public GitHub documentation snapshots, a derived source-to-claim knowledge graph view, and an isolated browser-local Judge Demo.
 
-**No milestone is fully signed off overall yet.** The Judge Demo acceptance decision is resolved and its browser isolation regression now passes in CI: interactive local edits, default-workspace preservation through entry/exit/reset, and no Supabase write requests during the tested demo flow. Managed Supabase and the other release gates remain open. The hosted Supabase project remains empty and unchanged. The earlier GitHub Actions run [#43620652179](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43620652179) passed, but its database runner applied only migration 1. This review corrected the gap. GitHub Actions run [#43681406630](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43681406630) passed both jobs: server security tests, TypeScript typecheck, production build, and the PostgreSQL 17 harness applying every migration file plus schema assertions and activity-reference smoke tests. The run includes commit `c7bd137`, which adjusts the invite-router tests to exercise the route's own 2 KB body limit and verifies oversized payloads are rejected before any Supabase call.
+**No milestone is fully signed off overall yet.** The Judge Demo acceptance decision is resolved and its browser isolation regression now passes in CI: interactive local edits, default-workspace preservation through entry/exit/reset, and no Supabase write requests during the tested demo flow. Managed Supabase and the other release gates remain open. The last independently verified hosted snapshot (2026-11-15) was empty. Later PR/release notes report eleven hosted migrations and fourteen public tables. The current audit could not recheck the connected project, so the live hosted state is unresolved; do not assume either the old empty state or the later reported migrated state. The earlier GitHub Actions run [#43620652179](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43620652179) passed, but its database runner applied only migration 1. This review corrected the gap. GitHub Actions run [#43681406630](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43681406630) passed both jobs: server security tests, TypeScript typecheck, production build, and the PostgreSQL 17 harness applying every migration file plus schema assertions and activity-reference smoke tests. The run includes commit `c7bd137`, which adjusts the invite-router tests to exercise the route's own 2 KB body limit and verifies oversized payloads are rejected before any Supabase call.
 
 ## Eight-milestone tracker
 
 | # | Milestone | Current status | Verified progress | Remaining blockers / acceptance evidence |
 |---|---|---|---|---|
-| 1 | Development foundation | In progress | `round3-development` exists and compares as ahead of `main` and 0 behind. Latest confirmed branch CI run #43681406630 passed both jobs. PR #1 is confirmed open, draft and unmerged, with 43 changed files in the current PR snapshot. The PR description was refreshed with the latest verification evidence and remaining gates. | Complete a full branch review, confirm the current PR head/status, review CI on the latest commit, and resolve the non-blocking large production-bundle warning. |
-| 2 | Supabase foundation | **Open — not signed off** | Draft 14-table schema, RLS, policies, triggers, RPCs, private Storage bucket, demo seed and assertions exist. Run #43681406630 passed the local PostgreSQL 17 harness after it was changed to apply all migrations in lexical order, including the append-only activity-reference smoke checks. Migration 2 now removes all three append-only-incompatible `ON DELETE SET NULL` references (source, claim and Auth user) and validates new source/claim references at insert time. Read-only hosted checks show PostgreSQL 17.11, `supabase_realtime` publication present, zero app tables, zero migration records and no advisor lints on the empty schema. | Managed Supabase roles/function ownership, PostgREST transaction-bound capability behavior, RLS/API role tests, Storage, Auth, Realtime, concurrency, and advisors after schema installation remain unverified. The hosted project must remain unchanged. The hosted managed-Supabase gates remain open. Latest smoke-test additions for cross-workspace activity references and immutable historical references are committed but await a confirmed CI result. |
+| 1 | Development foundation | In progress | `round3-development` exists and compares as ahead of `main` and 0 behind. Latest confirmed branch CI run #43681406630 passed both jobs. PR #1 and PR #2 are closed. Main contains corresponding web-flow commits, while the long-running development branch remains separate and diverged. Do not force-reset or rebase until the squash-merge ancestry is reconciled. | Complete a full branch review, confirm the current PR head/status, review CI on the latest commit, and resolve the non-blocking large production-bundle warning. |
+| 2 | Supabase foundation | **Open — not signed off** | Draft 14-table schema, RLS, policies, triggers, RPCs, private Storage bucket, demo seed and assertions exist. Run #43681406630 passed the local PostgreSQL 17 harness after it was changed to apply all migrations in lexical order, including the append-only activity-reference smoke checks. Migration 2 now removes all three append-only-incompatible `ON DELETE SET NULL` references (source, claim and Auth user) and validates new source/claim references at insert time. The last independently verified 2026-11-15 read-only snapshot showed PostgreSQL 17.11, the Realtime publication, zero app tables/migration records and no advisor lints on the empty schema. Later PR/release notes report eleven migrations and fourteen tables; the current hosted state was not rechecked. | Managed Supabase roles/function ownership, PostgREST transaction-bound capability behavior, RLS/API role tests, Storage, Auth, Realtime, concurrency, and advisors after schema installation remain unverified. The hosted project must remain unchanged. The hosted managed-Supabase gates remain open. Latest smoke-test additions for cross-workspace activity references and immutable historical references are committed but await a confirmed CI result. |
 | 3 | Authentication and RBAC | In progress — implementation present, managed runtime pending | Browser client uses publishable key only. AuthGate includes email/password sign-up/sign-in, Google OAuth initiation, password recovery/update, session restoration, sign-out, workspace membership lookup, workspace creation RPC and invite redemption. Server invite route validates the session through Supabase Auth and derives the user ID from the Auth response. | Verify real email confirmation/reset delivery, Google provider and callback configuration, invite redemption against managed Auth/PostgREST, all five roles and outsider isolation. Do not put the secret key in browser variables. |
 | 4 | Cloud persistence and Realtime | Partially implemented; end-to-end sign-off pending | `workspaceCloud.ts` loads/saves sources, claims, conflicts, missing-info findings, questions and activity events; it has private-bucket file operations, signed downloads, handover persistence and Realtime subscriptions. App selects cloud persistence only inside an authenticated workspace. | Full local-Supabase E2E is still required. A verified local-to-cloud importer with orphan filtering, row-count verification and a non-destructive preservation check is not present in the reviewed code. Realtime now subscribes to `activity_events` as well as the other workspace tables; build/typecheck passed in run #43681066786. |
 | 5 | Three promised improvements | Partial | Shared workspace access/invite foundation exists. Public GitHub repositories can be snapshotted and manually synced to a pinned commit. The Knowledge Graph page shows source-to-claim evidence links and related review state. | GitHub private-repo OAuth/background sync is absent. The graph is a derived evidence view, not persisted graph-node/edge construction or automatic dependency/change-impact/staleness propagation. Complete and test the promised depth or explicitly scope the submission claims. |
-| 6 | Judge Demo | Interactive local demo isolation verified; milestone acceptance met | Product acceptance is explicitly **interactive**, not read-only. New Playwright browser E2E test passes in CI: seeds default localStorage and IndexedDB records, enters the demo, verifies a claim-review decision persists under the demo namespace, uploads a source into the separate demo database, exits, re-enters and resets. Default workspace records remain byte-for-byte unchanged after exit and reset; demo IndexedDB/localStorage data is cleared; no write requests reach Supabase/test backend hosts. Gemini endpoints remain fail-closed. | Keep this isolation test in CI and do not describe the demo as read-only. This verifies the tested browser flow; it is not a substitute for managed Supabase or full application security testing. |
-| 7 | Security and end-to-end testing | Open — local CI strengthened | GitHub Actions run #43758917330 passed server security tests, typecheck, production build, all four Playwright browser E2E tests (including Judge Demo storage isolation), and the full local PostgreSQL 17 migration/assertion/adversarial smoke harness. Gemini endpoints remain fail-closed with HTTP 503 until workspace authorization exists. | Run the full test matrix against a local Supabase stack: anon/authenticated/service_role, owner/admin/editor/reviewer/viewer, cross-workspace isolation, invite expiry/revocation/replay/concurrency, last-owner races, Storage and Realtime. Add protected Gemini route tests before re-enabling AI. Local PostgreSQL is not managed Supabase validation. |
-| 8 | Final deployment and submission | Not ready | Existing app and repository links are known. No deployment or production migration was performed. | Only after gates pass: separately approved production migration/deployment, end-to-end smoke test, updated project PDF, improvements list, technical details, testing notes and verified individual team contributions. |
+| 6 | Judge Demo | Interactive local demo isolation verified; milestone acceptance met | Product acceptance is explicitly **interactive**, not read-only. New Playwright browser E2E test passes in CI: seeds default localStorage and IndexedDB records, enters the demo, verifies a claim-review decision persists under the demo namespace, uploads a source into the separate demo database, exits, re-enters and resets. Default workspace records remain byte-for-byte unchanged after exit and reset; demo IndexedDB/localStorage data is cleared; no write requests reach Supabase/test backend hosts. Gemini routes now validate Supabase sessions, workspace membership and route-specific roles; live managed-backend behavior and API-key availability remain unverified. | Keep this isolation test in CI and do not describe the demo as read-only. This verifies the tested browser flow; it is not a substitute for managed Supabase or full application security testing. |
+| 7 | Security and end-to-end testing | Open — local CI strengthened | GitHub Actions run #43758917330 passed server security tests, typecheck, production build, all four Playwright browser E2E tests (including Judge Demo storage isolation), and the full local PostgreSQL 17 migration/assertion/adversarial smoke harness. Server-side Gemini session and role authorization is implemented, with an explicit non-anonymous identity guard covered by a unit test. Managed Supabase and live Gemini behavior remain unverified. | Run the full test matrix against a local Supabase stack: anon/authenticated/service_role, owner/admin/editor/reviewer/viewer, cross-workspace isolation, invite expiry/revocation/replay/concurrency, last-owner races, Storage and Realtime. Add protected Gemini route tests before re-enabling AI. Local PostgreSQL is not managed Supabase validation. |
+| 8 | Final deployment and submission | Not ready | The release draft reports a Render deployment and hosted migrations, but this audit did not independently verify those claims. No deployment or production migration was performed by this automation run. | Only after gates pass: separately approved production migration/deployment, end-to-end smoke test, updated project PDF, improvements list, technical details, testing notes and verified individual team contributions. |
 
-## Current hosted Supabase baseline — read-only
+## Historical hosted Supabase baseline — read-only snapshot (2026-11-15)
 
 Project `asjxqshuvepjsqzttafc`:
 - PostgreSQL version: **17.11**.
@@ -52,7 +52,7 @@ No schema, data, Auth provider, Storage, secret, or deployment settings were cha
 ## Release rules
 
 - Never apply these migrations to the hosted project without a separate explicit production approval.
-- Never deploy, merge PR #1, change secrets, or modify live schema/data in this workflow.
+- Never deploy, merge, change secrets, or modify live schema/data in this workflow. PR #1 and #2 are closed; closure does not authorize further release actions.
 - Keep the service/secret key server-only; never use a `VITE_` prefix for it.
 - Do not mark Milestone 2 complete based on PostgreSQL stubs or empty-schema advisors.
 - The accepted Judge Demo is interactive within its isolated browser-local store; never claim it is read-only.
@@ -63,7 +63,7 @@ No schema, data, Auth provider, Storage, secret, or deployment settings were cha
 ### Verified repository and CI state
 
 - The `round3-development` branch exists and compares to `main` as ahead and 0 behind at review time. This is a branch-history comparison, not a statement that every development commit is release-ready.
-- PR #1 currently lists **60 changed files**. The review API returned no submitted PR reviews or inline review threads.
+- PR #1 and #2 are closed. The review APIs returned no submitted review records or inline review threads.
 - GitHub Actions run [#43758917330](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43758917330) is confirmed complete with both jobs successful: server tests/typecheck/build/Playwright E2E, and all-migrations PostgreSQL 17 validation plus adversarial smoke tests.
 - Two follow-up commits from this review improve Render-aware invite throttling. Their CI result is **pending** at the time of this note; do not reuse the previous green run as evidence for those new commits.
 
@@ -89,5 +89,44 @@ Milestone 2 remains **OPEN — not signed off**. The green CI run validates the 
 
 ### CI follow-up — 2026-11-16
 
-- GitHub Actions run [#43813310350](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43813310350) completed successfully on the current branch head. Both the application and database jobs passed, including server security tests, typecheck, production build, all four browser E2E tests, and the full local PostgreSQL 17 migration/assertion/adversarial harness. The Render-aware invite throttling fix and its regression test are included in this run.
+- GitHub Actions run [#43813583777](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43813583777) passed both jobs on the development branch head before the new 2026-11-17 changes. The new owner-guard migration, strict Gemini identity check, and AuthGate backport require a fresh CI run.
 - PR #1 metadata reports **60 changed files**, is open, draft, unmerged, and mergeable at this check. The branch head is `7abe16baea877ce18564e72e63492011758b2b49`.
+
+
+## Review addendum — 2026-11-17
+
+### Repository and pull-request state
+
+- At the start of this review, `round3-development` was `7d0360f8f949ae27bba40b0c1afc6450eef8a260`; `main` was `d8e6452dbd656983e6c73a7349a3106345e4be37`.
+- GitHub reported the refs as diverged (214 ahead / 2 behind at that point). PR #1 and PR #2 are closed. Their closure timestamps coincide with web-flow commits on main, but the issue API view did not expose a definitive merged flag. Preserve the development branch; do not force-reset/rebase based on commit counts alone.
+- PR review APIs returned no submitted reviews or inline review threads.
+- Branch-head run [#43813583777](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43813583777) passed both jobs before the new changes in this addendum. Run [#43880847494](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43880847494) also has both jobs recorded as successful for the submission-preparation work. The new changes below need a fresh run.
+
+### New development-branch work
+
+- Backported the main-branch AuthGate hardening: membership lookup failures clear the selected workspace; membership-table Realtime events trigger a fresh server-authorized lookup.
+- Added `20261117110000_require_atomic_owner_membership_changes.sql`. Direct owner membership deletion is denied by RLS and by the membership trigger; ownership must be transferred through the capability-gated atomic RPC, or the workspace must be deleted through its dedicated RPC.
+- Added schema assertions and adversarial smoke tests for RLS denial, trigger denial under RLS bypass, atomic ownership transfer, and former-owner departure. These tests are committed but pending a fresh CI result.
+- Gemini authorization now requires `is_anonymous === false`; a unit test covers anonymous, missing, malformed and valid user identities.
+- Replaced the generated README and added the Round 3 final submission readiness draft. The draft explicitly distinguishes implemented scope from live acceptance evidence.
+
+### Eight-milestone disposition
+
+| Milestone | Current disposition |
+|---|---|
+| 1 — Development foundation | In progress; PRs closed, branch history remains diverged |
+| 2 — Supabase foundation | **Open**; local PostgreSQL checks are not managed Supabase sign-off |
+| 3 — Authentication and RBAC | Implementation present; managed Auth/provider, invite and five-role matrix pending |
+| 4 — Cloud persistence and Realtime | Adapter present; full browser/managed Storage and Realtime acceptance pending |
+| 5 — Promised improvements | Partial; public GitHub sync and derived evidence graph only |
+| 6 — Judge Demo | Interactive browser-local isolation verified by CI; not read-only |
+| 7 — Security and E2E | Local CI exists; managed role, tenant, concurrency and Realtime matrix pending |
+| 8 — Final deployment/submission | Draft exists; final PDF, contributions and release acceptance not verified |
+
+### Hosted Supabase evidence conflict
+
+The previous read-only snapshot on 2026-11-15 reported zero application tables and zero migration history. PR #1's current description and the submission draft later report eleven hosted migrations, fourteen public tables, RLS, and seeded data. At the start of this review the repository had ten migration files; this review adds a new owner-guard migration, which is **not** the reported extra security-permissions migration. The exact reported hosted migration remains unidentified.
+
+The Supabase skill was not available from the connected skill registry during this run, so no current hosted Supabase tool calls were made. Treat the current migration history, table count, seed rows, advisor output, Auth/Storage configuration and project status as **unverified** until a fresh read-only check is available.
+
+No production database, Auth, Storage, secret, deployment or merge action was performed. No paid infrastructure was created.
