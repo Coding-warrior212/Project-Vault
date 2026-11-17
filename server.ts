@@ -33,6 +33,13 @@ app.get("/health", (_req: Request, res: Response) => {
 });
 
 // Keep the invite endpoint's small, dedicated JSON limit separate from document uploads.
+// Log only configuration presence (never values) to diagnose invite setup safely.
+console.info('[ProjectVault] Invite configuration presence:', {
+  supabaseUrl: Boolean(process.env.SUPABASE_URL?.trim()),
+  publishableKey: Boolean(process.env.SUPABASE_PUBLISHABLE_KEY?.trim()),
+  secretKey: Boolean(process.env.SUPABASE_SECRET_KEY?.trim()),
+});
+
 app.use(createInviteRouter());
 
 // AI endpoints accept identifiers only; document content is fetched from the
