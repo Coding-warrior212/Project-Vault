@@ -3,7 +3,7 @@
 **Team:** CYBERYODDHA  
 **Tagline:** Knowledge that stays. Projects that move.  
 **Working branch:** `round3-development`  
-**Pull request:** #1 (draft; intentionally not merged)
+**Pull requests:** #1 and #2 are closed; main has corresponding web-flow commits. The development branch remains separate and diverged; reconcile squash-merge history before any reset/rebase.
 
 ## Implemented in the current branch
 
@@ -56,7 +56,7 @@
 - The Supabase secret/service-role key is never exposed through a `VITE_` variable.
 - Data access depends on the database RLS policies and the authenticated user's JWT.
 - The app does not import local demo records into authenticated workspaces.
-- AI extraction and conflict-analysis API routes remain fail-closed (HTTP 503) until server-side user, workspace, and source authorization is implemented.
+- Gemini extraction and conflict-analysis routes validate the Supabase user session, require an explicitly non-anonymous identity, check workspace membership with the user's JWT/RLS, and enforce route-specific roles. The routes fetch source/claim data with the user's JWT. Live managed-backend behavior and Gemini key availability remain unverified.
 
 ## Verification evidence
 
@@ -70,13 +70,13 @@ The local Supabase Auth lifecycle test previously passed signup, password login,
 
 ## Not yet verified / remaining release gates
 - The new browser cloud adapter, file upload/download, handover UI, realtime behavior, and GitHub sync still require a full end-to-end run against the local Supabase stack after pulling this branch.
-- The hosted Supabase project has not been linked or migrated; no hosted schema/data changes have been made.
+- The last independently verified hosted Supabase snapshot (2026-11-15) was empty. Later PR/release notes report eleven hosted migrations and fourteen tables. The current run could not recheck the connected project; hosted state is unresolved and must not be described as either empty or migrated without a fresh read-only check.
 - Google OAuth provider configuration has not been verified in the Supabase dashboard.
-- AI extraction and conflict analysis remain disabled pending secure server-side authorization.
+- AI route authorization is implemented in code; dedicated negative route tests and managed Supabase/Gemini end-to-end verification remain outstanding.
 - The interactive judge demo's entry, supported review/handover interactions, refresh persistence, and reset-to-seed behavior have now passed browser checks. A separate browser check that pre-existing default-scope records remain unchanged across entering/exiting/resetting Judge Demo is still open.
 - GitHub private-repository OAuth and scheduled/background sync are not included.
 - The knowledge graph is source-to-claim evidence tracing, not full graph-node/edge persistence or automatic dependency propagation.
-- Deployment, PR merge, production migration, final PDF refresh, and submission have not been performed.
+- This audit did not deploy, merge, or apply hosted migrations. PR #1/#2 are closed; the release draft reports a Render deployment, but current deployment state was not independently verified. Final PDF and actual submission state are not verified here.
 
 ## Team contribution record
 Do not infer individual contributions. Confirm each member's actual work before completing the submission contribution section:
@@ -106,10 +106,20 @@ Commit `c7bd137` removes a global JSON parser from the invite-router test setup 
 
 ## Automation review — 2026-11-16 (latest)
 
-- PR #1 is open, draft, unmerged and mergeable; PR metadata reports 60 changed files. No submitted review records or inline review threads were returned.
+- PR #1 and #2 are closed. The review APIs returned no submitted review records or inline review threads.
 - GitHub Actions run [#43813310350](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43813310350) passed both jobs on the current branch head: server tests, typecheck, production build, Playwright E2E, all SQL migrations on disposable PostgreSQL 17, schema assertions, and adversarial smoke tests.
 - Fixed Render invite throttling's default client identity: when `RENDER=true`, use a syntactically validated `CF-Connecting-IP` unless explicitly disabled by `PROJECTVAULT_TRUST_CF_CONNECTING_IP=false`; never use caller-controlled `X-Forwarded-For`. Regression is included in run #43813310350. The limiter remains process-local/in-memory.
-- New high-priority static risk: owner-minimum AFTER trigger does not serialize concurrent direct owner-membership deletions; two simultaneous removals may leave no owner. Not yet reproduced; add parent-workspace locking and a two-session race test before Milestone 2 sign-off.
+- Owner lifecycle mitigation committed in `20261117110000_require_atomic_owner_membership_changes.sql`: direct owner deletion is denied by RLS and the membership trigger; owner changes must use the capability-gated atomic transfer RPC. New local assertions/smoke tests are pending CI and do not replace managed concurrency validation.
 - New session-staleness risk: AuthGate does not subscribe to workspace_members changes. Revocation while the app is open may leave active selection and loaded client data visible until refresh, though RLS should deny later database requests. Add a revocation E2E test and state-clearing behavior.
 - Hosted Supabase rechecked read-only: PostgreSQL 17.11, Realtime publication present, zero app tables, zero migration records, no Security/Performance/Health advisor lints on the empty schema. No hosted changes made.
 - Milestone 2 remains open. No production migration, deployment, merge, secret change, or paid service was used.
+
+
+## 2026-11-17 branch audit addendum
+
+- Development branch start-of-review head: `7d0360f8f949ae27bba40b0c1afc6450eef8a260`; main: `d8e6452dbd656983e6c73a7349a3106345e4be37`. PR #1 and #2 are closed. The branch refs compare as diverged; do not force-reset/rebase without reconciling squash-merge history.
+- The development branch now includes the main AuthGate membership-revocation fix, a ProjectVault-specific README, a final submission readiness draft, the owner-membership guard migration and tests, and a strict non-anonymous Gemini identity guard/unit test.
+- The branch-head CI run #43813583777 passed before these new changes. A fresh run is required for the current branch tip.
+- Repository had ten migration files at the start of this review. PR #1 release notes report eleven hosted migrations, including an extra security-permissions migration not identifiable in the original ten. The new owner-guard migration added in this review is not that reported migration. Current hosted migration history is unverified.
+- The last hosted read-only snapshot was 2026-11-15 and reported an empty schema; later release notes report a populated schema. Supabase skill discovery returned no available skill in this run, so the live project was not queried. Do not infer current hosted state.
+- No hosted database, Auth, Storage, secret, deployment, merge or paid infrastructure action was performed.
