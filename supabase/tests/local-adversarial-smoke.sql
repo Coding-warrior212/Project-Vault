@@ -258,7 +258,7 @@ $$;
 -- A former owner may leave after the atomic transfer.
 -- Perform the DELETE as the former owner, then reset the role before checking
 -- both rows; after departure, RLS correctly hides workspace_members from them.
-DO $
+DO $$
 DECLARE
   v_workspace text;
 BEGIN
@@ -267,13 +267,13 @@ BEGIN
   WHERE workspace_id=v_workspace
     AND user_id='11111111-1111-4111-8111-111111111111';
 END;
-$;
+$$;
 SELECT set_config('request.jwt.claim.sub', '', false);
 RESET ROLE;
 
 -- Inspect the committed membership state as the local database owner so RLS
 -- cannot hide the new owner's row from the former owner who just left.
-DO $
+DO $$
 DECLARE
   v_workspace text;
 BEGIN
@@ -296,7 +296,7 @@ BEGIN
     RAISE EXCEPTION 'Workspace lost its owner after former-owner departure';
   END IF;
 END;
-$;
+$$;
 
 -- Verify a caller-settable GUC does not unlock demo writes, even for service_role.
 SET ROLE service_role;
