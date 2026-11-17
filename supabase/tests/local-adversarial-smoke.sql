@@ -79,6 +79,89 @@ END;
 $$;
 RESET ROLE;
 
+-- Direct owner deletion must be blocked; ownership must be transferred first.
+-- Test the RLS policy as authenticated, then the trigger as a privileged SQL role
+-- with a user identity set (simulating an RLS-bypass path).
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
+DO $
+DECLARE
+  v_workspace text;
+BEGIN
+  SELECT id INTO v_workspace FROM public.workspaces WHERE code='INVREPLAY';
+  IF v_workspace IS NULL THEN RAISE EXCEPTION 'Owner guard workspace is missing'; END IF;
+
+  DELETE FROM public.workspace_members
+  WHERE workspace_id=v_workspace
+    AND user_id='11111111-1111-4111-8111-111111111111';
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.workspace_members
+    WHERE workspace_id=v_workspace
+      AND user_id='11111111-1111-4111-8111-111111111111'
+      AND role='owner'
+  ) THEN
+    RAISE EXCEPTION 'RLS allowed a direct owner self-delete';
+  END IF;
+END;
+$;
+RESET ROLE;
+
+SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
+DO $
+DECLARE
+  v_workspace text;
+  v_denied boolean := false;
+BEGIN
+  SELECT id INTO v_workspace FROM public.workspaces WHERE code='INVREPLAY';
+  BEGIN
+    DELETE FROM public.workspace_members
+    WHERE workspace_id=v_workspace
+      AND user_id='11111111-1111-4111-8111-111111111111';
+  EXCEPTION WHEN SQLSTATE '42501' THEN
+    v_denied := true;
+  END;
+
+  IF NOT v_denied THEN
+    RAISE EXCEPTION 'Owner membership trigger allowed direct deletion with RLS bypass';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.workspace_members
+    WHERE workspace_id=v_workspace
+      AND user_id='11111111-1111-4111-8111-111111111111'
+      AND role='owner'
+  ) THEN
+    RAISE EXCEPTION 'Rejected owner deletion unexpectedly removed the membership';
+  END IF;
+END;
+$;
+SELECT set_config('request.jwt.claim.sub', '', false);
+
+-- Ownership transfer is the authorized path and atomically demotes the old owner.
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
+SELECT * FROM public.transfer_workspace_ownership_atomic(
+  (SELECT id FROM public.workspaces WHERE code='INVREPLAY'),
+  '22222222-2222-4222-8222-222222222222',
+  'admin',
+  NULL
+);
+DO $
+DECLARE
+  v_workspace text;
+BEGIN
+  SELECT id INTO v_workspace FROM public.workspaces WHERE code='INVREPLAY';
+  IF (SELECT role FROM public.workspace_members WHERE workspace_id=v_workspace AND user_id='11111111-1111-4111-8111-111111111111') <> 'admin' THEN
+    RAISE EXCEPTION 'Ownership transfer did not demote the previous owner';
+  END IF;
+  IF (SELECT role FROM public.workspace_members WHERE workspace_id=v_workspace AND user_id='22222222-2222-4222-8222-222222222222') <> 'owner' THEN
+    RAISE EXCEPTION 'Ownership transfer did not promote the target owner';
+  END IF;
+END;
+$;
+RESET ROLE;
+
 -- Verify activity references are same-workspace at INSERT time and remain
 -- immutable historical identifiers after the referenced source/claim are deleted.
 SET ROLE authenticated;
@@ -170,7 +253,37 @@ BEGIN
     RAISE EXCEPTION 'Deleting a source/claim rewrote the append-only activity reference';
   END IF;
 END;
-$$;
+$;
+
+-- A former owner may leave after the atomic transfer; the new owner remains.
+DO $
+DECLARE
+  v_workspace text;
+BEGIN
+  SELECT id INTO v_workspace FROM public.workspaces WHERE code='INVREPLAY';
+  DELETE FROM public.workspace_members
+  WHERE workspace_id=v_workspace
+    AND user_id='11111111-1111-4111-8111-111111111111';
+
+  IF EXISTS (
+    SELECT 1 FROM public.workspace_members
+    WHERE workspace_id=v_workspace
+      AND user_id='11111111-1111-4111-8111-111111111111'
+  ) THEN
+    RAISE EXCEPTION 'Former owner could not leave after transfer';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.workspace_members
+    WHERE workspace_id=v_workspace
+      AND user_id='22222222-2222-4222-8222-222222222222'
+      AND role='owner'
+  ) THEN
+    RAISE EXCEPTION 'Workspace lost its owner after former-owner departure';
+  END IF;
+END;
+$;
+SELECT set_config('request.jwt.claim.sub', '', false);
 RESET ROLE;
 
 -- Verify a caller-settable GUC does not unlock demo writes, even for service_role.
