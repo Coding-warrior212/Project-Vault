@@ -78,6 +78,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
   const loadWorkspaceAccess = React.useCallback(async () => {
     if (!supabase || !session?.user?.id) {
       setWorkspaces([]);
+      setActiveWorkspace(null);
       return;
     }
 
@@ -95,6 +96,7 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
       const rows = memberships ?? [];
       if (rows.length === 0) {
         setWorkspaces([]);
+        setActiveWorkspace(null);
         return;
       }
 
@@ -119,7 +121,10 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
       setActiveWorkspace((current) => current && !allowed.some((workspace) => workspace.id === current.id) ? null : current);
     } catch (loadError) {
       console.error('[ProjectVault Auth] Workspace access lookup failed:', loadError);
+      // Fail closed in the UI: do not leave a previously selected workspace
+      // mounted when membership verification can no longer be completed.
       setWorkspaces([]);
+      setActiveWorkspace(null);
       setError('Workspace access could not be verified. Your private workspaces are hidden until access can be confirmed.');
     } finally {
       setWorkspaceLoading(false);
@@ -128,8 +133,33 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
 
   React.useEffect(() => {
     if (session) void loadWorkspaceAccess();
-    else setWorkspaces([]);
+    else {
+      setWorkspaces([]);
+      setActiveWorkspace(null);
+    }
   }, [session, loadWorkspaceAccess]);
+
+  React.useEffect(() => {
+    if (!supabase || !session?.user?.id) return;
+
+    // Membership changes trigger a fresh server-authorized lookup. The database
+    // remains the security boundary; this subscription only keeps the UI current.
+    const channel = supabase
+      .channel('workspace-membership:' + session.user.id)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'workspace_members',
+        filter: 'user_id=eq.' + session.user.id,
+      }, () => {
+        void loadWorkspaceAccess();
+      })
+      .subscribe();
+
+    return () => {
+      void supabase?.removeChannel(channel);
+    };
+  }, [session?.user?.id, loadWorkspaceAccess]);
 
   const handleAuth = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
