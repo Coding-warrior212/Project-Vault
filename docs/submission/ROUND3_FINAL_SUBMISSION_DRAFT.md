@@ -109,7 +109,7 @@ Record the date, tester, test account role, exact steps, expected result, actual
 
 - Browser uses a publishable Supabase key only.
 - Secret/service-role credentials must remain server-side and must never use a `VITE_` prefix.
-- RLS is enabled on all 14 observed public application tables.
+- Historical release/PR notes report RLS enabled on fourteen public application tables. This was **not independently rechecked in the 2026-11-17 audit**; the last verified read-only snapshot on 2026-11-15 showed an empty schema. Do not present the later table count as current independently verified evidence until a fresh read-only check reconciles the migration history.
 - Private source storage and signed downloads are implemented.
 - Workspace access must be tested across owner/admin/editor/reviewer/viewer roles and unrelated accounts.
 - The interactive Judge Demo uses a separate browser-local storage namespace and should not be described as read-only.
@@ -121,17 +121,16 @@ Record the date, tester, test account role, exact steps, expected result, actual
 
 ### Confirmed evidence
 
-- GitHub Actions run [#43880847494](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43880847494) completed successfully on this submission-preparation branch. Both jobs passed: server security tests, TypeScript typecheck, production build, Playwright browser E2E tests, and disposable PostgreSQL 17 full-migration/schema/adversarial smoke tests. This does not prove managed Supabase behavior.
-- Render deployment `dep-dbtg5sajnfac73dcg47g` reached `live`.
-- Supabase project status was `ACTIVE_HEALTHY`.
-- PR #1 release notes and this draft report eleven hosted migrations and fourteen public application tables with RLS enabled. The current development branch contains ten migration files; the additional reported security-permissions migration is not present in this repository snapshot. This discrepancy and the live schema state require a read-only migration-history check before any further migration or deployment.
+- The latest development-branch verification run [#44028139080](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44028139080) completed successfully on commit `08369cbe56ad5b9a790b6bcf16ac3945b50f11cd`. Both application and database jobs passed: server tests, typecheck, build, Playwright E2E, all eleven SQL migrations, schema assertions and adversarial smoke tests on disposable PostgreSQL 17. These checks do not validate managed Supabase.
+- Render service `Project-Vault` is on the free plan, auto-deploys from `main`, and its latest listed deployment is `live` at commit `d8e6452dbd656983e6c73a7349a3106345e4be37` (2026-11-16).
+- Historical PR/release notes report Supabase status `ACTIVE_HEALTHY`, eleven hosted migrations, and fourteen public application tables with RLS enabled. These claims were **not independently rechecked in the 2026-11-17 audit**. The current development branch contains eleven migration files, but the exact hosted migration history and the reported follow-up security-permissions migration have not been reconciled. The last verified read-only snapshot on 2026-11-15 showed zero application tables and zero migration records.
 - User personally confirmed email signup, email confirmation and arrival at the workspace section.
 
 ### Important limitations
 
 - CI against disposable/local PostgreSQL is not equivalent to managed Supabase Auth, PostgREST, Storage or Realtime verification.
 - Google OAuth is not enabled.
-- Invite redemption requires the server-only secret key to be configured in Render.
+- Invite redemption requires the server-only `SUPABASE_SECRET_KEY`; its current presence in Render environment settings was not checked in this audit. Never expose it through a `VITE_` variable.
 - Gemini endpoints have server-side session and role checks; live endpoint behavior and API-key configuration remain unverified.
 - Private GitHub OAuth/background sync is not delivered.
 - Persistent graph and automatic change-impact propagation are not delivered.
@@ -191,3 +190,13 @@ Each member must review and replace the draft below with a factual first-person 
 - The PR #1 description and this draft report eleven migrations in the hosted project, while the development repository contains ten migration files. The alleged additional security-permissions migration is not present in this branch. Retrieve/verify the exact hosted migration history and preserve the exact SQL in source control before any further migration.
 - A previous read-only Supabase snapshot on 2026-11-15 reported an empty schema; later PR/release notes report eleven migrations and fourteen tables. The current audit could not independently reconcile this because the Supabase skill was not available in the connected tool context. Treat hosted migration count, table count, seed rows, advisors, and current project state as **unverified** until a fresh read-only check is possible.
 - No production database, Auth, Storage, secrets, deployment, or pull-request merge action was performed in this audit. No paid infrastructure was created.
+
+## 12. Follow-up audit — 2026-11-17
+
+- The development branch is at `08369cbe56ad5b9a790b6bcf16ac3945b50f11cd` before this documentation update. CI run [#44028139080](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44028139080) passed both application and disposable PostgreSQL 17 jobs, including Playwright E2E and the full eleven-migration harness.
+- The owner-guard migration now blocks direct owner deletion through RLS and a trigger; ownership transfer uses deterministic membership-row locks. Local tests pass, but managed two-session/PostgREST concurrency remains unverified.
+- AuthGate includes a current-user membership Realtime subscription and clears active workspace state when access disappears or membership verification fails. Managed Realtime DELETE delivery remains unverified.
+- Source-file uploads use UUID object paths with `upsert: false`; replacements use new keys, so the deny-all Storage UPDATE policy does not block the current client upload path. Managed Storage API behavior remains pending.
+- PR #1 and PR #2 were merged into `main` on 2026-11-16. Render's free service is live from `main`; the development branch is not deployed. No merge or deployment was performed by this automation.
+- Current hosted Supabase state remains unverified in this audit because the connected Supabase skill was unavailable. Earlier PR/release reports of eleven hosted migrations and fourteen tables must remain labelled as historical reports until a fresh read-only check confirms them.
+- No production database, Auth, Storage, secrets, deployment, or paid infrastructure action was performed.

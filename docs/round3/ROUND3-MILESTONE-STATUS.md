@@ -130,3 +130,47 @@ The previous read-only snapshot on 2026-11-15 reported zero application tables a
 The Supabase skill was not available from the connected skill registry during this run, so no current hosted Supabase tool calls were made. Treat the current migration history, table count, seed rows, advisor output, Auth/Storage configuration and project status as **unverified** until a fresh read-only check is available.
 
 No production database, Auth, Storage, secret, deployment or merge action was performed. No paid infrastructure was created.
+
+## 2026-11-17 follow-up verification — current branch head
+
+**Reviewed branch head:** `08369cbe56ad5b9a790b6bcf16ac3945b50f11cd`  
+**CI:** [Run #44028139080](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44028139080) — **both jobs passed**.
+
+The successful run verifies:
+- server security tests;
+- TypeScript type-check;
+- Vite production build;
+- Playwright browser E2E;
+- all eleven checked-in SQL migrations in lexical order on disposable PostgreSQL 17;
+- schema assertions and the adversarial smoke suite, including owner self-delete denial, trigger denial, atomic transfer, former-owner departure, invite replay, demo immutability, and append-only activity references.
+
+The run is local/disposable PostgreSQL validation, not managed Supabase acceptance.
+
+### Corrected review findings
+
+- The owner-guard smoke test initially had malformed single-dollar PL/pgSQL block delimiters. They were corrected.
+- The next run exposed an RLS-observation mistake: after the former owner leaves, their JWT correctly cannot see the remaining owner's membership row. The test now performs the deletion under the former owner's JWT, resets role/claims, and checks final membership state as the local database owner. The latest run passes.
+- AuthGate already subscribes to the current user's `workspace_members` changes and clears the selected workspace when access disappears or membership verification fails. Managed Realtime DELETE delivery still needs live testing.
+- Storage upload uses unique UUID object paths with `upsert: false`; the deny-all UPDATE policy does not block the current replacement path because replacement creates a new object. Same-key upsert remains unsupported.
+
+### Updated eight-milestone disposition
+
+| Milestone | Current disposition |
+|---|---|
+| 1 — Development foundation | Branch and CI exist; PR #1 and #2 merged into main. Development branch remains diverged and unprotected. |
+| 2 — Supabase foundation | **Open — not signed off.** Eleven checked-in migrations pass disposable PostgreSQL 17. Current hosted migration history, managed roles/ownership, PostgREST capabilities, RLS matrix, Storage, Auth, Realtime, concurrency and post-schema advisors are unverified. |
+| 3 — Authentication and RBAC | AuthGate, email/password, Google OAuth initiation, workspace membership and server invite boundary exist. Google provider, live email/reset, invite RPC, and all five roles still need managed acceptance. |
+| 4 — Cloud persistence and Realtime | Workspace data adapter, private file operations and Realtime subscriptions exist. Managed Storage/Realtime acceptance and a verified local-to-cloud importer remain outstanding. |
+| 5 — Three promised improvements | Shared workspace foundation exists; GitHub is public-repository/manual sync; graph is derived source-to-claim evidence. Private OAuth/background sync and automatic persisted change-impact propagation are not delivered. |
+| 6 — Judge Demo | Interactive browser-local demo isolation passes Playwright E2E. It is not read-only. |
+| 7 — Security and E2E | Current local CI passes. Managed JWT/RLS, concurrency, Storage, Realtime and live Gemini tests remain open. |
+| 8 — Final deployment/submission | Render free service is live from `main`; development branch is not deployed. Final PDF, live end-to-end evidence, member contributions and submission confirmation remain outstanding. |
+
+### Deployment and repository facts
+
+- Render service `Project-Vault` is on the free plan, configured to auto-deploy from `main`; latest listed deployment is live at commit `d8e6452dbd656983e6c73a7349a3106345e4be37`.
+- PR #1 and PR #2 were merged on 2026-11-16. No merge or deployment was performed by this automation.
+- The development branch is unprotected; no branch-protection settings were changed.
+- The current repository has eleven migration files. The later report of eleven hosted migrations/fourteen public tables is not independently rechecked in this run. The last verified hosted snapshot is 2026-11-15 and was empty; the Supabase skill was unavailable, so current hosted state must remain **unverified**.
+
+**User action required today:** none. No hosted migration, deployment, secret change, merge, or paid resource is requested or performed.

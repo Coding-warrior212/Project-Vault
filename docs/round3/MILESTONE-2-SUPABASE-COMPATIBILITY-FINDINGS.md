@@ -216,3 +216,46 @@ The 2026-11-15 read-only snapshot reported zero hosted application tables and ze
 - Submission-preparation run [#43880847494](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43880847494) has both jobs recorded as successful.
 - The owner-guard migration, AuthGate backport, strict Gemini identity test and updated docs need a new CI run.
 - Milestone 2 remains **OPEN — not signed off**. No hosted migration, deployment, merge, secret change or paid service was used.
+
+## 2026-11-17 follow-up — owner lifecycle and CI result
+
+### Owner-membership lifecycle
+
+The current branch includes `20261117110000_require_atomic_owner_membership_changes.sql`. It replaces the earlier direct-owner-removal exposure with two layers:
+- the authenticated DELETE policy excludes rows whose role is `owner`;
+- the SECURITY DEFINER membership trigger rejects owner-row deletion unless the transaction has the expected internal capability.
+
+The existing ownership-transfer RPC locks all membership rows for the workspace in deterministic order before checking the caller and changing roles. Workspace deletion uses its separate authenticated, actor-bound capability path and locks invites/memberships before deleting the workspace.
+
+The local smoke test verifies direct owner self-delete is denied by RLS, a privileged SQL path without the capability is rejected by the trigger, atomic transfer demotes the previous owner, and the former owner can subsequently leave while the new owner remains. The final state assertion must run outside the former owner's RLS context; otherwise RLS correctly hides the remaining membership after departure.
+
+### Test defects found and corrected
+
+Two consecutive CI failures exposed defects in the smoke test:
+1. Several PL/pgSQL blocks used a single-dollar delimiter (`DO $` / `$;`), which PostgreSQL rejects. These were corrected to `$$`.
+2. The former-owner departure test attempted to verify the new owner's row before resetting the former owner's role. That query was filtered by RLS, producing a false failure even though the transfer had succeeded. The test now performs the DELETE under the former owner's JWT, resets the role/claim, then inspects final membership state as the local database owner.
+
+**Verification:** CI run [#44028139080](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44028139080) passed both jobs on branch commit `08369cbe56ad5b9a790b6bcf16ac3945b50f11cd`, including the complete eleven-migration PostgreSQL 17 harness and application E2E job.
+
+This proves the local harness path only. It does not prove a two-session managed concurrency test or PostgREST request behavior.
+
+### Application-side revocation and Storage findings
+
+- AuthGate has a filtered Realtime subscription to the signed-in user's `workspace_members` rows. A membership event triggers a fresh RLS-authorized membership query; no membership or a query failure clears the active workspace. Managed DELETE event delivery still needs live validation.
+- File upload uses `<workspace>/<source>/<uuid>-<safe filename>` with `upsert: false`; replacement uses a new object key. The Storage UPDATE policy remains deny-all and does not block the current upload path. Managed Storage API behavior and cleanup-failure recovery remain unverified.
+
+### Current hosted-state limitation
+
+The repository now contains eleven migration files. PR/release documentation reports eleven hosted migrations and fourteen public tables with RLS, while the last independently verified hosted snapshot (2026-11-15) reported zero application tables and zero migration records. The connected Supabase skill was unavailable during this review, so no current hosted calls were made. The exact hosted migration history and current tables/advisors/Auth/Storage/Realtime state remain **unverified**. Do not apply or replay any migration on the hosted project based on this report.
+
+### Release gates still open
+
+1. Reconcile the exact hosted migration history with all checked-in SQL files and identify the reported follow-up security-permissions migration.
+2. Verify function owners, grants and transaction-bound capability behavior through real PostgREST/API role contexts.
+3. Test all five workspace roles and cross-workspace isolation with real JWTs.
+4. Test invite expiry/revocation/replay/concurrency and the invite endpoint's service-role boundary.
+5. Test Storage upload/download/delete and membership revocation through managed Realtime.
+6. Run a managed two-session owner-transfer/removal concurrency test.
+7. Review Security, Performance and Health Advisors against the actual populated schema.
+
+**Milestone 2 remains OPEN — not signed off.**
