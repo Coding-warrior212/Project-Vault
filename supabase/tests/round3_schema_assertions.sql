@@ -103,6 +103,21 @@ BEGIN
     SELECT 1 FROM storage.buckets WHERE id='projectvault-sources' AND public=false
   ) THEN RAISE EXCEPTION 'Private projectvault-sources bucket is missing or public'; END IF;
 
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='public'
+      AND tablename='workspace_members'
+      AND policyname='workspace_members_delete_policy'
+      AND qual ILIKE '%role <> ''owner''%'
+  ) THEN
+    RAISE EXCEPTION 'Direct workspace-member DELETE policy must exclude owner rows';
+  END IF;
+
+  IF pg_get_functiondef('public.enforce_workspace_member_guards()'::regprocedure)
+       NOT ILIKE '%OWNER_DELETE_REQUIRES_TRANSFER%' THEN
+    RAISE EXCEPTION 'Membership trigger must require atomic ownership transfer before owner deletion';
+  END IF;
+
   RAISE NOTICE 'ProjectVault Round 3 schema assertions passed.';
 END;
 $$;
