@@ -137,3 +137,14 @@ Commit `c7bd137` removes a global JSON parser from the invite-router test setup 
 - GitHub reports the development branch as unprotected. Required CI checks are not enforced by branch protection; no repository settings were changed.
 - The repository now contains eleven migration files. PR/release documentation reports eleven hosted migrations and fourteen public tables, but the current hosted state could not be rechecked because the Supabase skill is unavailable in the connected skill registry. The last independently verified read-only snapshot remains 2026-11-15 (empty application schema). Do not treat later hosted-state claims as independently verified.
 - No hosted database, Auth, Storage, secrets, deployment, merge, or paid infrastructure action was performed in this review.
+
+### Main/development migration drift — verified 2026-11-17
+
+GitHub's recursive tree shows:
+- `main` at `d8e6452dbd656983e6c73a7349a3106345e4be37` contains **10** migration files;
+- `round3-development` contains **11** migration files;
+- the only additional development migration is `20261117110000_require_atomic_owner_membership_changes.sql`.
+
+Render auto-deploys from `main`, and its latest listed live deployment is the `main` commit above. Therefore the new owner-guard migration is **not present in the deployed main source tree**. There is no current verified evidence that an equivalent owner guard is installed in hosted Supabase. Treat last-owner protection in the live environment as unresolved until the exact hosted schema is inspected.
+
+PR #1/release notes report eleven hosted migrations, including a follow-up security-permissions migration that is not present in either current branch migration directory. The repository's 10-versus-11 migration count and the reported hosted count are not reconciled. Do not apply, replay, merge, or deploy migrations to resolve this automatically; first identify and archive the exact hosted migration history and SQL.

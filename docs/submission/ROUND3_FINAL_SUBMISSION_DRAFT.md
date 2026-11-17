@@ -200,3 +200,9 @@ Each member must review and replace the draft below with a factual first-person 
 - PR #1 and PR #2 were merged into `main` on 2026-11-16. Render's free service is live from `main`; the development branch is not deployed. No merge or deployment was performed by this automation.
 - Current hosted Supabase state remains unverified in this audit because the connected Supabase skill was unavailable. Earlier PR/release reports of eleven hosted migrations and fourteen tables must remain labelled as historical reports until a fresh read-only check confirms them.
 - No production database, Auth, Storage, secrets, deployment, or paid infrastructure action was performed.
+
+### Main/development migration drift — 2026-11-17
+
+GitHub's current tree shows ten migration files on `main` and eleven on `round3-development`. The additional development-only file is the owner-membership guard migration. Render deploys from `main`, so this new migration is not part of the deployed source tree. The current hosted database state was not rechecked; do not claim the live database has this owner guard.
+
+Earlier PR/release notes report eleven hosted migrations and a follow-up security-permissions migration that is not present in either branch's migration directory. Reconcile the exact hosted migration history and preserve the missing SQL before any further production migration or release action.

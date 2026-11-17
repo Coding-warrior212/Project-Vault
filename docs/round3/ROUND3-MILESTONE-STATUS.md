@@ -174,3 +174,14 @@ The run is local/disposable PostgreSQL validation, not managed Supabase acceptan
 - The current repository has eleven migration files. The later report of eleven hosted migrations/fourteen public tables is not independently rechecked in this run. The last verified hosted snapshot is 2026-11-15 and was empty; the Supabase skill was unavailable, so current hosted state must remain **unverified**.
 
 **User action required today:** none. No hosted migration, deployment, secret change, merge, or paid resource is requested or performed.
+
+### Main/development migration drift — verified 2026-11-17
+
+GitHub's recursive tree shows:
+- `main` at `d8e6452dbd656983e6c73a7349a3106345e4be37` contains **10** migration files;
+- `round3-development` contains **11** migration files;
+- the only additional development migration is `20261117110000_require_atomic_owner_membership_changes.sql`.
+
+Render auto-deploys from `main`, and its latest listed live deployment is the `main` commit above. Therefore the new owner-guard migration is **not present in the deployed main source tree**. There is no current verified evidence that an equivalent owner guard is installed in hosted Supabase. Treat last-owner protection in the live environment as unresolved until the exact hosted schema is inspected.
+
+PR #1/release notes report eleven hosted migrations, including a follow-up security-permissions migration that is not present in either current branch migration directory. The repository's 10-versus-11 migration count and the reported hosted count are not reconciled. Do not apply, replay, merge, or deploy migrations to resolve this automatically; first identify and archive the exact hosted migration history and SQL.
