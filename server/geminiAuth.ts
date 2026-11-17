@@ -24,6 +24,18 @@ export type WorkspaceAuthorization =
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** Accept only a structurally valid, explicitly non-anonymous Supabase user. */
+export function isVerifiedWorkspaceUser(
+  user: { id?: unknown; is_anonymous?: unknown } | null | undefined,
+): user is { id: string; is_anonymous: false } {
+  return Boolean(
+    user &&
+    typeof user.id === 'string' &&
+    UUID_PATTERN.test(user.id) &&
+    user.is_anonymous === false
+  );
+}
+
 export async function authorizeGeminiWorkspace(
   authorizationHeader: string | undefined,
   workspaceIdValue: unknown,
@@ -90,7 +102,7 @@ export async function authorizeGeminiWorkspace(
       };
     }
 
-    if (user.is_anonymous !== false) {
+    if (!isVerifiedWorkspaceUser(user)) {
       return {
         ok: false,
         status: 403,
