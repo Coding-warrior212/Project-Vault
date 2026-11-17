@@ -90,7 +90,7 @@ export async function authorizeGeminiWorkspace(
       };
     }
 
-    if (user.is_anonymous) {
+    if (user.is_anonymous !== false) {
       return {
         ok: false,
         status: 403,
