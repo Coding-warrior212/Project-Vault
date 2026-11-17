@@ -84,7 +84,7 @@ RESET ROLE;
 -- with a user identity set (simulating an RLS-bypass path).
 SET ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
-DO $
+DO $$
 DECLARE
   v_workspace text;
 BEGIN
@@ -104,11 +104,11 @@ BEGIN
     RAISE EXCEPTION 'RLS allowed a direct owner self-delete';
   END IF;
 END;
-$;
+$$;
 RESET ROLE;
 
 SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
-DO $
+DO $$
 DECLARE
   v_workspace text;
   v_denied boolean := false;
@@ -135,7 +135,7 @@ BEGIN
     RAISE EXCEPTION 'Rejected owner deletion unexpectedly removed the membership';
   END IF;
 END;
-$;
+$$;
 SELECT set_config('request.jwt.claim.sub', '', false);
 
 -- Ownership transfer is the authorized path and atomically demotes the old owner.
@@ -147,7 +147,7 @@ SELECT * FROM public.transfer_workspace_ownership_atomic(
   'admin',
   NULL
 );
-DO $
+DO $$
 DECLARE
   v_workspace text;
 BEGIN
@@ -159,7 +159,7 @@ BEGIN
     RAISE EXCEPTION 'Ownership transfer did not promote the target owner';
   END IF;
 END;
-$;
+$$;
 RESET ROLE;
 
 -- Verify activity references are same-workspace at INSERT time and remain
@@ -253,10 +253,10 @@ BEGIN
     RAISE EXCEPTION 'Deleting a source/claim rewrote the append-only activity reference';
   END IF;
 END;
-$;
+$$;
 
 -- A former owner may leave after the atomic transfer; the new owner remains.
-DO $
+DO $$
 DECLARE
   v_workspace text;
 BEGIN
@@ -282,7 +282,7 @@ BEGIN
     RAISE EXCEPTION 'Workspace lost its owner after former-owner departure';
   END IF;
 END;
-$;
+$$;
 SELECT set_config('request.jwt.claim.sub', '', false);
 RESET ROLE;
 
