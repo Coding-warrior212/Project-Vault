@@ -298,6 +298,43 @@ BEGIN
 END;
 $$;
 
+-- Verify the former owner receives only their own private membership-revocation signal.
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
+SELECT set_config('realtime.topic', 'pv-membership-revoked:11111111-1111-4111-8111-111111111111', false);
+DO $
+DECLARE
+  v_workspace text;
+BEGIN
+  SELECT id INTO v_workspace FROM public.workspaces WHERE code='INVREPLAY';
+  IF NOT EXISTS (
+    SELECT 1 FROM realtime.messages
+    WHERE topic='pv-membership-revoked:11111111-1111-4111-8111-111111111111'
+      AND event='membership_revoked'
+      AND private
+      AND payload->>'workspace_id'=v_workspace
+  ) THEN
+    RAISE EXCEPTION 'Former owner did not receive the targeted private revocation signal';
+  END IF;
+END;
+$;
+
+-- A different authenticated user cannot read the former owner's revocation topic.
+SELECT set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', false);
+SELECT set_config('realtime.topic', 'pv-membership-revoked:11111111-1111-4111-8111-111111111111', false);
+DO $
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM realtime.messages
+    WHERE topic='pv-membership-revoked:11111111-1111-4111-8111-111111111111'
+      AND event='membership_revoked'
+  ) THEN
+    RAISE EXCEPTION 'Another workspace user can read the former owner revocation signal';
+  END IF;
+END;
+$;
+RESET ROLE;
+
 -- Verify a caller-settable GUC does not unlock demo writes, even for service_role.
 SET ROLE service_role;
 SELECT set_config('projectvault.seed_mode','on',false);
