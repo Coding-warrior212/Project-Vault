@@ -5,33 +5,46 @@ import { subscribeToOwnWorkspaceMembershipChanges } from './membershipRealtime';
 
 const USER_ID = '2d931510-d99f-494a-8c67-87feb05e1594';
 
-test('membership subscription filters inserts and updates but not deletes', async () => {
+test('membership changes use user filters and a private user-specific revocation channel', async () => {
   const registrations: Array<{
+    topic: string;
+    config?: Record<string, unknown>;
+    type: string;
     filter: Record<string, unknown>;
     callback: () => void;
   }> = [];
-  let channelName = '';
-  let removed = false;
+  const removedTopics: string[] = [];
   let notifications = 0;
 
-  const channel = {
-    on: (_type: string, filter: Record<string, unknown>, callback: () => void) => {
-      registrations.push({ filter, callback });
-      return channel;
-    },
-    subscribe: () => channel,
+  const makeChannel = (topic: string, config?: Record<string, unknown>) => {
+    const channel = {
+      on: (type: string, filter: Record<string, unknown>, callback: () => void) => {
+        registrations.push({ topic, config, type, filter, callback });
+        return channel;
+      },
+      subscribe: () => channel,
+    };
+    return channel;
   };
 
   const client = {
-    channel: (name: string) => {
-      channelName = name;
-      return channel;
-    },
-    removeChannel: async () => {
-      removed = true;
+    channel: (topic: string, config?: Record<string, unknown>) => makeChannel(topic, config),
+    removeChannel: async (channel: { topic?: string }) => {
+      removedTopics.push(channel.topic ?? '');
       return 'ok';
     },
   } as unknown as SupabaseClient;
+
+  // Capture channel identities for the cleanup assertion.
+  const originalChannel = client.channel.bind(client);
+  const channelObjects: Array<{ topic: string }> = [];
+  (client as unknown as { channel: (topic: string, config?: Record<string, unknown>) => unknown }).channel =
+    (topic, config) => {
+      const value = makeChannel(topic, config) as unknown as { topic: string };
+      Object.defineProperty(value, 'topic', { value: topic });
+      channelObjects.push(value);
+      return value;
+    };
 
   const unsubscribe = subscribeToOwnWorkspaceMembershipChanges(
     client,
@@ -39,24 +52,40 @@ test('membership subscription filters inserts and updates but not deletes', asyn
     () => { notifications += 1; },
   );
 
-  assert.equal(channelName, `workspace-membership:${USER_ID}`);
-  assert.deepEqual(registrations.map((item) => item.filter), [
+  assert.equal(typeof originalChannel, 'function');
+  assert.deepEqual(registrations.map((item) => ({
+    topic: item.topic,
+    type: item.type,
+    filter: item.filter,
+    private: item.config?.private,
+  })), [
     {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'workspace_members',
-      filter: `user_id=eq.${USER_ID}`,
+      topic: `workspace-membership:${USER_ID}`,
+      type: 'postgres_changes',
+      filter: {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'workspace_members',
+        filter: `user_id=eq.${USER_ID}`,
+      },
+      private: undefined,
     },
     {
-      event: 'UPDATE',
-      schema: 'public',
-      table: 'workspace_members',
-      filter: `user_id=eq.${USER_ID}`,
+      topic: `workspace-membership:${USER_ID}`,
+      type: 'postgres_changes',
+      filter: {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'workspace_members',
+        filter: `user_id=eq.${USER_ID}`,
+      },
+      private: undefined,
     },
     {
-      event: 'DELETE',
-      schema: 'public',
-      table: 'workspace_members',
+      topic: `pv-membership-revoked:${USER_ID}`,
+      type: 'broadcast',
+      filter: { event: 'membership_revoked' },
+      private: true,
     },
   ]);
 
@@ -65,7 +94,10 @@ test('membership subscription filters inserts and updates but not deletes', asyn
 
   unsubscribe();
   await Promise.resolve();
-  assert.equal(removed, true);
+  assert.deepEqual(removedTopics.sort(), [
+    `pv-membership-revoked:${USER_ID}`,
+    `workspace-membership:${USER_ID}`,
+  ]);
 });
 
 test('membership subscription rejects an empty user ID', () => {
