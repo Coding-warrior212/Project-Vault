@@ -118,6 +118,33 @@ BEGIN
     RAISE EXCEPTION 'Membership trigger must require atomic ownership transfer before owner deletion';
   END IF;
 
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='realtime'
+      AND tablename='messages'
+      AND policyname='users receive their own membership revocation broadcasts'
+      AND qual ILIKE '%pv-membership-revoked:%'
+  ) THEN
+    RAISE EXCEPTION 'Private user-specific membership revocation policy is missing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger t
+    JOIN pg_class c ON c.oid=t.tgrelid
+    JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname='public'
+      AND c.relname='workspace_members'
+      AND t.tgname='trg_broadcast_workspace_membership_revocation'
+      AND NOT t.tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'Workspace membership revocation broadcast trigger is missing';
+  END IF;
+
+  IF pg_get_functiondef('public.broadcast_workspace_membership_revocation()'::regprocedure)
+       NOT ILIKE '%realtime.send%' THEN
+    RAISE EXCEPTION 'Membership revocation trigger must send a targeted Realtime broadcast';
+  END IF;
+
   RAISE NOTICE 'ProjectVault Round 3 schema assertions passed.';
 END;
 $$;
