@@ -5,6 +5,7 @@ import { KnowledgeNetwork3D, Vault3DLogo } from '../common/Soft3DVisuals';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { WorkspaceSessionProvider } from './WorkspaceSessionContext';
 import { resetLocalDemoData, setLocalStorageScope } from '../../services/db';
+import { subscribeToOwnWorkspaceMembershipChanges } from '../../services/membershipRealtime';
 
 type WorkspaceAccess = {
   id: string;
@@ -142,23 +143,14 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
   React.useEffect(() => {
     if (!supabase || !session?.user?.id) return;
 
-    // Membership changes trigger a fresh server-authorized lookup. The database
-    // remains the security boundary; this subscription only keeps the UI current.
-    const channel = supabase
-      .channel('workspace-membership:' + session.user.id)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'workspace_members',
-        filter: 'user_id=eq.' + session.user.id,
-      }, () => {
-        void loadWorkspaceAccess();
-      })
-      .subscribe();
-
-    return () => {
-      void supabase?.removeChannel(channel);
-    };
+    // Membership changes trigger a fresh server-authorized lookup. DELETE
+    // events use an unfiltered invalidation handler because RLS-protected
+    // Realtime deletes cannot reliably filter on the removed user_id.
+    return subscribeToOwnWorkspaceMembershipChanges(
+      supabase,
+      session.user.id,
+      () => { void loadWorkspaceAccess(); },
+    );
   }, [session?.user?.id, loadWorkspaceAccess]);
 
   const handleAuth = async (event: React.FormEvent<HTMLFormElement>) => {
