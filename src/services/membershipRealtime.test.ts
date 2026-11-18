@@ -16,35 +16,23 @@ test('membership changes use user filters and a private user-specific revocation
   const removedTopics: string[] = [];
   let notifications = 0;
 
-  const makeChannel = (topic: string, config?: Record<string, unknown>) => {
-    const channel = {
-      on: (type: string, filter: Record<string, unknown>, callback: () => void) => {
-        registrations.push({ topic, config, type, filter, callback });
-        return channel;
-      },
-      subscribe: () => channel,
-    };
-    return channel;
-  };
-
   const client = {
-    channel: (topic: string, config?: Record<string, unknown>) => makeChannel(topic, config),
-    removeChannel: async (channel: { topic?: string }) => {
-      removedTopics.push(channel.topic ?? '');
-      return 'ok';
+    channel: (topic: string, config?: Record<string, unknown>) => {
+      const channel = {
+        topic,
+        on: (type: string, filter: Record<string, unknown>, callback: () => void) => {
+          registrations.push({ topic, config, type, filter, callback });
+          return channel;
+        },
+        subscribe: () => channel,
+      };
+      return channel;
+    },
+    removeChannel: async (channel: { topic: string }) => {
+      removedTopics.push(channel.topic);
+      return 'ok',
     },
   } as unknown as SupabaseClient;
-
-  // Capture channel identities for the cleanup assertion.
-  const originalChannel = client.channel.bind(client);
-  const channelObjects: Array<{ topic: string }> = [];
-  (client as unknown as { channel: (topic: string, config?: Record<string, unknown>) => unknown }).channel =
-    (topic, config) => {
-      const value = makeChannel(topic, config) as unknown as { topic: string };
-      Object.defineProperty(value, 'topic', { value: topic });
-      channelObjects.push(value);
-      return value;
-    };
 
   const unsubscribe = subscribeToOwnWorkspaceMembershipChanges(
     client,
@@ -52,7 +40,6 @@ test('membership changes use user filters and a private user-specific revocation
     () => { notifications += 1; },
   );
 
-  assert.equal(typeof originalChannel, 'function');
   assert.deepEqual(registrations.map((item) => ({
     topic: item.topic,
     type: item.type,
