@@ -148,3 +148,55 @@ GitHub's recursive tree shows:
 Render auto-deploys from `main`, and its latest listed live deployment is the `main` commit above. Therefore the new owner-guard migration is **not present in the deployed main source tree**. There is no current verified evidence that an equivalent owner guard is installed in hosted Supabase. Treat last-owner protection in the live environment as unresolved until the exact hosted schema is inspected.
 
 PR #1/release notes report eleven hosted migrations, including a follow-up security-permissions migration that is not present in either current branch migration directory. The repository's 10-versus-11 migration count and the reported hosted count are not reconciled. Do not apply, replay, merge, or deploy migrations to resolve this automatically; first identify and archive the exact hosted migration history and SQL.
+
+## 2026-11-18 review — branch, deployment, and membership-revocation hardening
+
+### Repository and deployment state verified from GitHub and Render
+
+- `round3-development` head at the start of this review: `cb83c7adde50ee5a3fec97d3f7a9d82fcbfccb70`. The latest completed verification for that head was GitHub Actions run [#44028581080](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44028581080); both the application and PostgreSQL 17 jobs succeeded.
+- This review added a membership-revocation invalidation fix and a unit test. Code commits: `78c19ae`, `c10fb5b`, `5843563`, `1a420eb`, and `3812038`. A fresh CI run for the new code is pending; the previous green run does not cover these commits.
+- GitHub branch metadata reports `protected: false` for `round3-development`. The branch-protection detail endpoint returned 403 to the connected integration, so detailed protection/ruleset configuration could not be inspected.
+- The current comparison reports `round3-development` and `main` as diverged (234 commits ahead, 3 behind, merge base `67cd33b`). PR #1 and PR #2 are closed and merged. PR #3, “Fix Google OAuth error handling”, remains open against `main` from `fix/oauth-invite-reliability`; it has no submitted reviews or inline review threads in the current review API response. Do not merge it automatically.
+- Render service `Project-Vault` is on the Free plan, auto-deploys from `main`, and its latest listed live deployment is commit `5f3657cffe0fada2ebb22a32814492dd1c48965c`. No deployment was triggered by this review.
+- The checked-in migration directories contain 10 SQL files on `main` and 11 on `round3-development`. The only additional development migration is `20261117110000_require_atomic_owner_membership_changes.sql`. It is not in the deployed `main` source tree. Do not infer that the equivalent guard exists in hosted Supabase.
+
+### Membership revocation and Realtime authorization finding
+
+Static review found that AuthGate previously subscribed to `workspace_members` with `event: '*'` and a `user_id` filter. Supabase documents that DELETE filtering requires `REPLICA IDENTITY FULL`; with RLS enabled, the old record may still expose only the primary key, so a `user_id` filter is not a reliable revocation signal. Supabase also documents that Realtime authorization is cached for the connection until JWT expiry or a new token is sent. A removed member could therefore retain an open workspace subscription until the client revalidates and unsubscribes.
+
+The development branch now:
+- filters INSERT and UPDATE notifications to the signed-in user's `user_id`;
+- listens for `workspace_members` DELETE without a row filter and treats it only as an invalidation signal (the payload is ignored);
+- re-queries the signed-in user's memberships through RLS; and
+- relies on the app's active-workspace effect cleanup to remove the workspace data channels when membership is no longer returned.
+
+The unfiltered DELETE signal is intentionally coarse: it can cause other connected users to re-check their own membership after a membership deletion. The code does not consume or expose the deleted row payload. The table is already in the `supabase_realtime` publication. A unit test was added to assert the event/filter registration and cleanup behavior.
+
+This is a code-level mitigation, not managed Realtime acceptance. Test actual DELETE delivery, RLS behavior, revocation timing, and channel cleanup against the connected Supabase project before sign-off.
+
+Official references:
+- [Supabase Postgres Changes — DELETE filters and replica identity](https://supabase.com/docs/guides/realtime/postgres-changes)
+- [Supabase Postgres Changes troubleshooting — RLS and old records](https://supabase.com/kb/troubleshooting/realtime-postgres-changes-troubleshooting)
+- [Supabase Realtime authorization — policy cache and revocation](https://supabase.com/docs/guides/realtime/authorization)
+
+### Additional code review observations
+
+- `server.ts` mounts the invite router before the general 16 KB JSON parser, so the invite router's dedicated 2 KB parser is not shadowed by the global parser.
+- `server/geminiAuth.ts` validates the bearer session with Supabase Auth, rejects anonymous users, looks up membership through the user's JWT/RLS, and checks route-specific role allowlists.
+- `workspaceCloud.ts` uses workspace-scoped table filters and authenticated client operations. Source files use UUID object keys and `upsert: false`, so the deny-all Storage UPDATE policy does not block the implemented replacement path; same-key upsert remains unsupported.
+- The membership revocation fix is committed but its new CI result is pending. No local/managed Supabase runtime test was performed in this review.
+
+### Hosted Supabase status and milestone disposition
+
+The Supabase skill is not currently available in the connected skill registry (the skill listing returned no entries and the documented URI returned Resource not found). Therefore no current connected Supabase read-only query was run. The last independently verified hosted snapshot remains 2026-11-15 (zero application tables and zero migration history); later project notes report a populated 14-table/11-migration state, but that later state remains unverified. Do not apply or replay migrations.
+
+- Milestone 1 — development foundation: substantial code and CI exist; branch drift and absent protection remain process risks.
+- Milestone 2 — Supabase foundation: **OPEN — not signed off**. Managed schema/history, function owners/grants, PostgREST capabilities, JWT/RLS matrix, Storage, Realtime revocation, owner concurrency, and populated-schema advisors remain unverified.
+- Milestone 3 — Auth/RBAC: implementation present; managed email confirmation, Google provider/callback, invite lifecycle and all-five-role acceptance remain pending. PR #3 is still open.
+- Milestone 4 — cloud persistence/Realtime: workspace adapter and subscriptions are implemented; managed acceptance and a verified local-to-cloud importer remain outstanding.
+- Milestone 5 — promised improvements: shared workspace foundation, public GitHub manual sync and evidence graph exist; private GitHub OAuth/background sync and automated dependency/staleness propagation are not delivered.
+- Milestone 6 — Judge Demo: interactive browser-local isolation is covered by Playwright; it is not read-only.
+- Milestone 7 — security/E2E: previous code-bearing CI passed; this review's membership-revocation change needs a fresh run, and managed security tests remain open.
+- Milestone 8 — final deployment/submission: Render is live from `main`; final PDF, live managed acceptance evidence, individual contribution statements and submission confirmation are not verified.
+
+No hosted schema/data/Auth/Storage settings, secrets, GitHub merge, Render deployment, or paid resource was changed. No user action is required for this review.
