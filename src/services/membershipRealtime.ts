@@ -1,14 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * Subscribe to changes affecting the signed-in user's workspace memberships.
+ * Keep workspace membership state current without exposing other members'
+ * deletion metadata to every connected workspace user.
  *
- * INSERT and UPDATE events can be filtered by user_id. DELETE events cannot
- * reliably be filtered by user_id on an RLS-protected table: Realtime only
- * exposes the old primary key by default, and DELETE events are not evaluated
- * against row policies. The unfiltered DELETE handler therefore acts only as
- * an invalidation signal. It ignores the payload and asks the caller to
- * re-query the current user's memberships through RLS.
+ * INSERT/UPDATE use a row filter for the signed-in user. A private Broadcast
+ * topic receives a database-triggered revocation signal addressed only to
+ * that user. The payload is treated only as an invalidation signal; access
+ * is always re-queried through the user's JWT and RLS.
  */
 export function subscribeToOwnWorkspaceMembershipChanges(
   client: SupabaseClient,
@@ -23,9 +22,9 @@ export function subscribeToOwnWorkspaceMembershipChanges(
     filter: `user_id=eq.${userId}`,
   } as const;
 
-  const channel = client.channel(`workspace-membership:${userId}`);
+  const membershipChannel = client.channel(`workspace-membership:${userId}`);
 
-  channel
+  membershipChannel
     .on('postgres_changes', {
       event: 'INSERT',
       ...ownMembershipFilter,
@@ -34,17 +33,15 @@ export function subscribeToOwnWorkspaceMembershipChanges(
       event: 'UPDATE',
       ...ownMembershipFilter,
     }, onMembershipChange)
-    .on('postgres_changes', {
-      // Do not add a user_id filter here. The old row is not available for
-      // reliable filtering under RLS, so this callback revalidates access
-      // after any membership deletion without reading the event payload.
-      event: 'DELETE',
-      schema: 'public',
-      table: 'workspace_members',
-    }, onMembershipChange)
+    .subscribe();
+
+  const revocationChannel = client
+    .channel(`pv-membership-revoked:${userId}`, { config: { private: true } })
+    .on('broadcast', { event: 'membership_revoked' }, onMembershipChange)
     .subscribe();
 
   return () => {
-    void client.removeChannel(channel);
+    void client.removeChannel(membershipChannel);
+    void client.removeChannel(revocationChannel);
   };
 }
