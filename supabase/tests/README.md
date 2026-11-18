@@ -86,3 +86,9 @@ The migration set removes `ON DELETE SET NULL` foreign keys from activity-event 
 ## Atomic owner membership changes
 
 Migration `20261117110000_require_atomic_owner_membership_changes.sql` denies direct deletion of owner membership rows through both RLS and the membership trigger. Ownership changes must use `transfer_workspace_ownership_atomic`; workspace deletion uses `delete_workspace_atomic`. The local smoke test verifies RLS denial, trigger denial under RLS bypass, successful transfer, and former-owner departure. This does not replace a managed Supabase/PostgREST concurrency test.
+
+## Membership revocation broadcast
+
+Migration `20261118100000_membership_revocation_broadcast.sql` sends a private Broadcast to `pv-membership-revoked:<user_id>` after a workspace membership row is deleted. The `realtime.messages` SELECT policy permits only the authenticated user whose UID matches the topic. AuthGate listens on that user-specific private channel, then re-queries memberships through RLS and clears the active workspace if access was revoked.
+
+The local PostgreSQL stand-in records attempted `realtime.send` calls so the smoke test can verify the topic, event, payload, and RLS policy shape. It does not emulate WebSocket delivery or managed Realtime authorization caching. The live DELETE-to-private-Broadcast path must still be tested against managed Supabase before Milestone 2 sign-off.
