@@ -29,7 +29,7 @@ test('membership subscription filters inserts and updates but not deletes', asyn
     },
     removeChannel: async () => {
       removed = true;
-      return 'ok',
+      return 'ok';
     },
   } as unknown as SupabaseClient;
 
