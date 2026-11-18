@@ -237,3 +237,34 @@ The Supabase skill is not currently available in the connected skill registry (t
 - Milestone 8 — final deployment/submission: Render is live from `main`; final PDF, live managed acceptance evidence, individual contribution statements and submission confirmation are not verified.
 
 No hosted schema/data/Auth/Storage settings, secrets, GitHub merge, Render deployment, or paid resource was changed. No user action is required for this review.
+
+## 2026-11-18 follow-up — targeted private membership-revocation Broadcast
+
+The earlier same-day review proposed an unfiltered Postgres DELETE invalidation handler. That approach would have caused every connected subscriber to re-check membership after any membership deletion. It has been superseded by a narrower, user-targeted private Broadcast.
+
+### Current implementation on `round3-development`
+
+- New migration: `20261118100000_membership_revocation_broadcast.sql`.
+- An AFTER DELETE trigger sends `realtime.send(..., 'membership_revoked', 'pv-membership-revoked:' || OLD.user_id, true)`.
+- A SELECT policy on `realtime.messages` permits only the authenticated user whose `auth.uid()` matches the user ID encoded in the private topic.
+- AuthGate keeps filtered Postgres INSERT/UPDATE subscriptions for the signed-in user's own membership and listens on a separate private Broadcast channel `pv-membership-revoked:<user_id>`.
+- On notification, AuthGate re-queries memberships using the user's JWT/RLS. If the active workspace is no longer authorized, the existing app effect clears its data and removes the workspace Realtime channels.
+- The Broadcast payload contains only the workspace ID and is treated as an invalidation signal, never as authorization evidence.
+
+### Local validation added
+
+- The disposable PostgreSQL Realtime stand-in now records calls to `realtime.send`; it still does not emulate WebSocket delivery.
+- The schema assertions require the private per-user SELECT policy, trigger, and Broadcast call.
+- The adversarial smoke test verifies that the removed member can read their own notification topic and a different authenticated user cannot read that topic.
+- A TypeScript unit test verifies the two filtered membership handlers, private per-user Broadcast channel configuration, and channel cleanup.
+
+The local test suite must pass on the latest branch head before this change is considered locally verified. Managed Realtime delivery, private-channel authorization, actual token-cache behavior, and end-to-end revocation timing remain required before Milestone 2 sign-off.
+
+### Migration and release state
+
+- `main` still contains 10 migration files.
+- `round3-development` now contains 12 migration files: the additional owner-membership guard and this new membership-revocation Broadcast migration.
+- Render still auto-deploys from `main`; neither development-only migration is present in the currently listed live deployment source tree.
+- The Supabase skill remains unavailable in the connected skill registry, so current hosted schema/history and advisor state remain unverified. No hosted migration was applied.
+
+**Milestone 2 remains OPEN — not signed off.** No production changes, deployment, merge, secret change, or paid resource was made.
