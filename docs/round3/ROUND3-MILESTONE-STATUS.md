@@ -292,3 +292,7 @@ These changes are reviewed textually and committed, but **a new CI run is requir
 The prior workflow failure must not be represented as green. The application job failed while running server tests; later typecheck/build/browser steps were skipped. The database job failed before migrations due to the malformed local Realtime stub. The three corrections above target those logged failure causes; the new branch snapshot remains unverified until CI completes successfully.
 
 **Milestone 2 remains OPEN — no managed Supabase compatibility/security sign-off.** No production schema/data, Auth/Storage settings, secrets, merge, deployment, or paid resource was changed.
+
+### Follow-up static verification of the repair commits
+
+After the three CI-failure fixes were committed, the current files were re-fetched from `round3-development` and scanned textually: the local Realtime stub has **5 opening/5 closing `$$` function tags** and no malformed single-dollar `AS $`/`$;` tags; the smoke test has **12 `DO $$` blocks and 12 `$$;` closers** with no malformed `DO $`/`$;` tags; the membership test contains `return 'ok';` and no old `return 'ok',` fragment. This is a static delimiter/syntax-pattern check only, not PostgreSQL execution or TypeScript compilation. CI result for the post-fix branch is not exposed by the connected workflow-run tools in this review, so verification remains pending.
