@@ -30,7 +30,7 @@ test('membership changes use user filters and a private user-specific revocation
     },
     removeChannel: async (channel: { topic: string }) => {
       removedTopics.push(channel.topic);
-      return 'ok',
+      return 'ok';
     },
   } as unknown as SupabaseClient;
 
