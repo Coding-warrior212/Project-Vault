@@ -97,14 +97,14 @@ CREATE OR REPLACE FUNCTION realtime.send(
 )
 RETURNS void
 LANGUAGE plpgsql
-AS $
+AS $$
 BEGIN
   -- Record the attempted message so SQL tests can verify topic scoping and
   -- RLS policy shape. This does NOT implement WebSocket delivery.
   INSERT INTO realtime.messages (topic, extension, payload, event, private)
   VALUES (topic, 'broadcast', payload, event, private);
 END;
-$;
+$$;
 
 GRANT USAGE ON SCHEMA realtime TO authenticated;
 GRANT SELECT ON realtime.messages TO authenticated;
