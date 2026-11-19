@@ -302,7 +302,7 @@ $$;
 SET ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
 SELECT set_config('realtime.topic', 'pv-membership-revoked:11111111-1111-4111-8111-111111111111', false);
-DO $
+DO $$
 DECLARE
   v_workspace text;
 BEGIN
@@ -317,12 +317,12 @@ BEGIN
     RAISE EXCEPTION 'Former owner did not receive the targeted private revocation signal';
   END IF;
 END;
-$;
+$$;
 
 -- A different authenticated user cannot read the former owner's revocation topic.
 SELECT set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', false);
 SELECT set_config('realtime.topic', 'pv-membership-revoked:11111111-1111-4111-8111-111111111111', false);
-DO $
+DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM realtime.messages
@@ -332,7 +332,7 @@ BEGIN
     RAISE EXCEPTION 'Another workspace user can read the former owner revocation signal';
   END IF;
 END;
-$;
+$$;
 RESET ROLE;
 
 -- Verify a caller-settable GUC does not unlock demo writes, even for service_role.
