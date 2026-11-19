@@ -353,3 +353,27 @@ The local test suite must pass on the latest branch head before this change is c
 - The Supabase skill remains unavailable in the connected skill registry, so current hosted schema/history and advisor state remain unverified. No hosted migration was applied.
 
 **Milestone 2 remains OPEN — not signed off.** No production changes, deployment, merge, secret change, or paid resource was made.
+
+## 2026-11-19 review — CI failure triage and test syntax repairs
+
+### Verified CI failure on the preceding code snapshot
+
+Workflow run [#44244690750](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44244690750) ran on commit `a11331b8b52903d77eea01fadfaa06dd4a72659a` and **failed both jobs**. Retrieved job logs identify three test-harness syntax defects (not an application runtime failure):
+
+- `supabase/tests/local-bootstrap.sql`: the disposable `realtime.send` stand-in had single-dollar function-body delimiters (`AS $` / `$;`), causing PostgreSQL syntax error.
+- `supabase/tests/local-adversarial-smoke.sql`: two private Broadcast authorization checks used malformed `DO $` / `$;` delimiters.
+- `src/services/membershipRealtime.test.ts`: the mocked `removeChannel` function had `return 'ok',` instead of a valid statement terminator.
+
+### Repairs committed to `round3-development`
+
+- `4db1146443d7cb363b6bb656b8a120c80d01b2d3` — corrected the Realtime SQL stand-in function delimiters.
+- `c0af5f7a16c47b3949496ba1565eb4981662b985` — corrected both smoke-test DO block delimiters.
+- `f53fb5c94c19820f786b58b9cd631625acbef8dd` — corrected the membership Realtime test mock syntax.
+
+These changes are reviewed textually and committed, but **a new CI run is required** to confirm they compile and pass together. No local Docker/PostgreSQL execution was available in this automation runtime.
+
+### CI follow-up
+
+The prior workflow failure must not be represented as green. The application job failed while running server tests; later typecheck/build/browser steps were skipped. The database job failed before migrations due to the malformed local Realtime stub. The three corrections above target those logged failure causes; the new branch snapshot remains unverified until CI completes successfully.
+
+**Milestone 2 remains OPEN — no managed Supabase compatibility/security sign-off.** No production schema/data, Auth/Storage settings, secrets, merge, deployment, or paid resource was changed.
