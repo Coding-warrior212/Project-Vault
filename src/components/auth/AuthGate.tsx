@@ -143,9 +143,9 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
   React.useEffect(() => {
     if (!supabase || !session?.user?.id) return;
 
-    // Membership changes trigger a fresh server-authorized lookup. DELETE
-    // events use an unfiltered invalidation handler because RLS-protected
-    // Realtime deletes cannot reliably filter on the removed user_id.
+    // Membership changes trigger a fresh server-authorized lookup. INSERT/UPDATE
+    // are filtered to this user; revocation uses a private user-specific Broadcast.
+    // Every notification is only an invalidation signal, never authorization proof.
     return subscribeToOwnWorkspaceMembershipChanges(
       supabase,
       session.user.id,
@@ -189,12 +189,18 @@ export const AuthGate: React.FC<React.PropsWithChildren> = ({ children }) => {
     if (!supabase) return;
     setBusy(true);
     setError('');
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin },
-    });
-    if (oauthError) {
-      setError(oauthError.message);
+    setMessage('');
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      });
+      if (oauthError) throw oauthError;
+    } catch (oauthError) {
+      console.error('[ProjectVault Auth] Google sign-in failed:', oauthError);
+      setError(oauthError instanceof Error
+        ? oauthError.message
+        : 'Google sign-in could not be started. Please try again.');
       setBusy(false);
     }
   };
