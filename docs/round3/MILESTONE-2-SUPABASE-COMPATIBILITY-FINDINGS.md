@@ -377,3 +377,20 @@ These changes are reviewed textually and committed, but **a new CI run is requir
 The prior workflow failure must not be represented as green. The application job failed while running server tests; later typecheck/build/browser steps were skipped. The database job failed before migrations due to the malformed local Realtime stub. The three corrections above target those logged failure causes; the new branch snapshot remains unverified until CI completes successfully.
 
 **Milestone 2 remains OPEN — no managed Supabase compatibility/security sign-off.** No production schema/data, Auth/Storage settings, secrets, merge, deployment, or paid resource was changed.
+## 2026-11-20 review — branch-head CI and Realtime broadcast caveat
+
+### CI verification state
+
+- The latest development commit before this review was `ce659f3d55ecc40f83f0f77b8062a3e19c25dfad`, confirmed identical to the `round3-development` ref.
+- The retrieved workflow run `44244690750` failed in both application and PostgreSQL jobs. Three test-syntax fixes are present in later commits, but no CI status is exposed for the branch head by the available connected GitHub tools. Static checks are not runtime validation.
+- The development branch compares to `main` as 260 ahead and 3 behind. The 12 development migration files are not all present on `main` (10 migration files).
+
+### Database Broadcast partition caveat
+
+Supabase's current Broadcast guide and troubleshooting article document that database `realtime.send()` inserts into a daily partition of `realtime.messages`, but the function itself does not create that partition. WebSocket client connections create the rolling partitions. If no current-day partition exists, the broadcast insert is dropped with `WarnSendingBroadcastMessage`. The membership-revocation Broadcast therefore remains a best-effort invalidation signal. It must never be used as authorization proof; clients and all subsequent data access must revalidate membership through RLS. Managed delivery and behavior when the target is offline or partitions are absent remain untested.
+
+References:
+- https://supabase.com/docs/guides/realtime/broadcast
+- https://supabase.com/kb/troubleshooting/realtime-warn-sending-broadcast-message
+
+Milestone 2 remains OPEN. No connected Supabase read-only query was run because the Supabase skill registry returned no available skill. No hosted migration, schema/data/Auth/Storage change, deployment, merge, secret change, or paid resource was performed.
