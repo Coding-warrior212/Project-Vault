@@ -325,3 +325,13 @@ Official documentation:
 ## 2026-11-20 documentation correction
 
 The M7 row and executive summary were corrected to reflect the later failed workflow run #44244690750 and the post-failure test repairs. Run #43681406630 and #43758917330 are historical green results on earlier snapshots; they do not certify the latest code. The exact branch head before this documentation correction was `0ae2ecc19ff6422a61e9d11d17c515e40d6b4003`, and the current branch comparison remains 260 ahead / 3 behind. No current CI result is available through the connected workflow-run tool.
+## 2026-11-20 follow-up — OAuth startup handling on development
+
+Code review found that the development branch's Google OAuth initiation handled returned errors but not thrown/rejected startup failures, which could leave the sign-in button in a busy state. I applied the small try/catch correction from the open PR #3 pattern directly to AuthGate on the development branch, and corrected the nearby stale comment to describe the current private per-user Broadcast (rather than the superseded unfiltered DELETE listener).
+
+- Commit: `119e6cbf7490a594a1d26f5f137725dfe506edc7`.
+- The patch was inspected through its GitHub commit diff. It clears stale messages, catches thrown OAuth errors, logs a diagnostic and restores the busy state on failure.
+- PR #3 remains open and was not merged. Hosted Google OAuth configuration and end-to-end login remain unverified.
+- No local test, build or browser run was possible in this automation runtime because the repository is not mounted here. GitHub status checks for the branch head are not exposed by the connected workflow-run tool.
+
+Milestone 3 remains **in progress**. This is a code-level error-handling improvement, not live OAuth acceptance.
