@@ -298,10 +298,10 @@ BEGIN
 END;
 $$;
 
--- Verify the former owner receives only their own private membership-revocation signal.
-SET ROLE authenticated;
-SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
-SELECT set_config('realtime.topic', 'pv-membership-revoked:11111111-1111-4111-8111-111111111111', false);
+-- Verify the trigger recorded a targeted private signal before testing RLS visibility.
+-- Read as the disposable database owner first, so trigger recording and policy
+-- filtering are separate assertions and failures identify the correct layer.
+RESET ROLE;
 DO $$
 DECLARE
   v_workspace text;
@@ -314,11 +314,29 @@ BEGIN
       AND private
       AND payload->>'workspace_id'=v_workspace
   ) THEN
-    RAISE EXCEPTION 'Former owner did not receive the targeted private revocation signal';
+    RAISE EXCEPTION 'Membership revocation trigger did not record its targeted private signal';
   END IF;
 END;
 $$;
 
+-- Then verify the former owner can see only the private topic addressed to them.
+SET ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', false);
+SELECT set_config('realtime.topic', 'pv-membership-revoked:11111111-1111-4111-8111-111111111111', false);
+DO $$
+DECLARE
+  v_visible boolean;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1 FROM realtime.messages
+    WHERE topic='pv-membership-revoked:11111111-1111-4111-8111-111111111111'
+      AND event='membership_revoked'
+  ) INTO v_visible;
+  IF NOT v_visible THEN
+    RAISE EXCEPTION 'RLS did not expose the former owner private revocation signal';
+  END IF;
+END;
+$$;
 -- A different authenticated user cannot read the former owner's revocation topic.
 SELECT set_config('request.jwt.claim.sub', '22222222-2222-4222-8222-222222222222', false);
 SELECT set_config('realtime.topic', 'pv-membership-revoked:11111111-1111-4111-8111-111111111111', false);

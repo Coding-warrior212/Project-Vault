@@ -44,7 +44,7 @@ test('membership changes use user filters and a private user-specific revocation
     topic: item.topic,
     type: item.type,
     filter: item.filter,
-    private: item.config?.private,
+    private: (item.config?.config as { private?: boolean } | undefined)?.private,
   })), [
     {
       topic: `workspace-membership:${USER_ID}`,
