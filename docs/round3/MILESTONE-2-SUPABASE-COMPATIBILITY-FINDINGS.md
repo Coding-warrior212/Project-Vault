@@ -394,3 +394,18 @@ References:
 - https://supabase.com/kb/troubleshooting/realtime-warn-sending-broadcast-message
 
 Milestone 2 remains OPEN. No connected Supabase read-only query was run because the Supabase skill registry returned no available skill. No hosted migration, schema/data/Auth/Storage change, deployment, merge, secret change, or paid resource was performed.
+
+
+## 2026-11-21 review — current local acceptance evidence
+
+- The branch CI run [#44870786326](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44870786326) passed both jobs on code-bearing commit `83194cdbd2bd4a68521c4ba73d0b0fd25751d3d2`.
+- The disposable PostgreSQL 17 job applied all migration files, ran schema assertions and adversarial smoke tests, and passed. The earlier private membership Broadcast test was split into a privileged trigger-recording assertion and an authenticated topic/RLS visibility assertion to isolate failures without relaxing policies.
+- The application job passed the server security tests, type-check, production build and Playwright E2E.
+- The membership Realtime unit test now asserts the SDK's nested private channel config shape (`config.private`).
+- Branch protection is disabled and the development branch is diverged (268 ahead / 3 behind). The branch head is `83194cdbd2bd4a68521c4ba73d0b0fd25751d3d2`.
+
+These results verify the code-bearing snapshot in the CI harness only. **They do not sign off managed Supabase**: current hosted migration history/schema, function ownership/grants, PostgREST capabilities, Auth, Storage, actual private Broadcast delivery, concurrency and populated-schema advisors remain unverified. The Supabase skill is unavailable, so no fresh connected read-only query was run.
+
+Render read-only configuration confirms the free service deploys from `main`; its latest live deployment is `5f3657cffe0fada2ebb22a32814492dd1c48965c`. The development branch is not live.
+
+No production migration, data/schema/Auth/Storage change, secret change, merge, deployment, or paid resource was made. No user action is required today.

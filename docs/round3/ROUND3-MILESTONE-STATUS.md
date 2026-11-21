@@ -1,6 +1,6 @@
 # ProjectVault Round 3 — Milestone Status
 
-**Snapshot:** 2026-11-20
+**Snapshot:** 2026-11-21
 **Repository:** `Coding-warrior212/Project-Vault`  
 **Working branch:** `round3-development`  
 **Release constraints:** free-only; preserve `main` and the hosted Supabase project until explicit release approval.
@@ -16,7 +16,7 @@ The development branch has advanced beyond the earlier authentication-only snaps
 | # | Milestone | Current status | Verified progress | Remaining blockers / acceptance evidence |
 |---|---|---|---|---|
 | 1 | Development foundation | In progress | Review began at `ce659f3d55ecc40f83f0f77b8062a3e19c25dfad`; documentation-only review commits subsequently advanced the branch ref. At the review snapshot it compared to `main` as 267 commits ahead and 3 behind (merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`). PR #1, #2, and #4 are merged; PR #3 remains open. The development branch remains diverged. Do not force-reset or rebase until squash-merge ancestry is reconciled. | Complete a full branch review, confirm the current PR head/status, review CI on the latest commit, and resolve the non-blocking large production-bundle warning. |
-| 2 | Supabase foundation | **Open — not signed off** | Draft 14-table schema, RLS, policies, triggers, RPCs, private Storage bucket, demo seed and assertions exist. Run #43681406630 passed the local PostgreSQL 17 harness after it was changed to apply all migrations in lexical order, including the append-only activity-reference smoke checks. Migration 2 now removes all three append-only-incompatible `ON DELETE SET NULL` references (source, claim and Auth user) and validates new source/claim references at insert time. The last independently verified 2026-11-15 read-only snapshot showed PostgreSQL 17.11, the Realtime publication, zero app tables/migration records and no advisor lints on the empty schema. Later PR/release notes report eleven migrations and fourteen tables; the current hosted state was not rechecked. | Managed Supabase roles/function ownership, PostgREST transaction-bound capability behavior, RLS/API role tests, Storage, Auth, Realtime, concurrency, and advisors after schema installation remain unverified. The hosted project must remain unchanged. The hosted managed-Supabase gates remain open. The latest branch's three CI syntax repairs are committed, but a post-fix workflow run/status is not available through the connected GitHub workflow tools in this review. |
+| 2 | Supabase foundation | **Open — not signed off** | Draft 14-table schema, RLS, policies, triggers, RPCs, private Storage bucket, demo seed and assertions exist. Run #43681406630 passed the local PostgreSQL 17 harness after it was changed to apply all migrations in lexical order, including the append-only activity-reference smoke checks. Migration 2 now removes all three append-only-incompatible `ON DELETE SET NULL` references (source, claim and Auth user) and validates new source/claim references at insert time. The last independently verified 2026-11-15 read-only snapshot showed PostgreSQL 17.11, the Realtime publication, zero app tables/migration records and no advisor lints on the empty schema. Later PR/release notes report eleven migrations and fourteen tables; the current hosted state was not rechecked. | Managed Supabase roles/function ownership, PostgREST transaction-bound capability behavior, RLS/API role tests, Storage, Auth, Realtime, concurrency, and advisors after schema installation remain unverified. The hosted project must remain unchanged. The hosted managed-Supabase gates remain open. CI run #44870786326 passed the current code-bearing branch snapshot, including the full local PostgreSQL 17 migration/assertion/smoke job and the server tests, typecheck, production build and Playwright E2E. Managed Supabase acceptance remains unverified. |
 | 3 | Authentication and RBAC | In progress — implementation present, managed runtime pending | Browser client uses publishable key only. AuthGate includes email/password sign-up/sign-in, Google OAuth initiation, password recovery/update, session restoration, sign-out, workspace membership lookup, workspace creation RPC and invite redemption. Server invite route validates the session through Supabase Auth and derives the user ID from the Auth response. | Verify real email confirmation/reset delivery, Google provider and callback configuration, invite redemption against managed Auth/PostgREST, all five roles and outsider isolation. Do not put the secret key in browser variables. |
 | 4 | Cloud persistence and Realtime | Partially implemented; end-to-end sign-off pending | `workspaceCloud.ts` loads/saves sources, claims, conflicts, missing-info findings, questions and activity events; it has private-bucket file operations, signed downloads, handover persistence and Realtime subscriptions. App selects cloud persistence only inside an authenticated workspace. | Full local-Supabase E2E is still required. A verified local-to-cloud importer with orphan filtering, row-count verification and a non-destructive preservation check is not present in the reviewed code. Realtime now subscribes to `activity_events` as well as the other workspace tables; build/typecheck passed in run #43681066786. |
 | 5 | Three promised improvements | Partial | Shared workspace access/invite foundation exists. Public GitHub repositories can be snapshotted and manually synced to a pinned commit. The Knowledge Graph page shows source-to-claim evidence links and related review state. | GitHub private-repo OAuth/background sync is absent. The graph is a derived evidence view, not persisted graph-node/edge construction or automatic dependency/change-impact/staleness propagation. Complete and test the promised depth or explicitly scope the submission claims. |
@@ -359,3 +359,26 @@ The repairs are committed only to `round3-development`; CI will validate the new
 Supabase skill discovery returned no skills and its documented skill URI returned Resource not found. No fresh connected Supabase query was run. Historical hosted reports remain inconsistent with the last independently verified empty-schema snapshot. Milestone 2 stays **OPEN — no managed compatibility/security sign-off**.
 
 No live database/schema/data, Auth/Storage settings, secrets, merge, deployment, or paid resource was changed. No user action is required today.
+
+
+## 2026-11-21 review — CI repairs verified
+
+### Branch and CI
+
+- Current code-bearing branch snapshot `83194cdbd2bd4a68521c4ba73d0b0fd25751d3d2` passed workflow [#44870786326](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44870786326).
+- The PostgreSQL 17 job applied the full migration set and passed schema assertions and adversarial smoke tests.
+- The application job passed server security tests, TypeScript type-check, production build, and Playwright browser E2E.
+- The previous failure #44679254146 was correctly diagnosed: the unit test inspected the wrong nested private-channel option; the SQL smoke failure was made more diagnostic by separating trigger recording from authenticated RLS visibility. The fixes are committed in `83194cd`.
+- Branch protection is disabled; compare against `main` is 268 ahead / 3 behind, merge base `67cd33b`. Do not reset/rebase blindly.
+
+### Managed Supabase status
+
+Supabase skill discovery and the documented skill URI failed; no fresh connected query was run. The current hosted migration history/schema, function ownership/grants, managed role matrix, Auth, Storage, Realtime, concurrency and populated-schema advisors remain unverified. Milestone 2 is **OPEN — no managed compatibility/security sign-off**.
+
+### Render deployment verified read-only
+
+Render service configuration was re-read: `Project-Vault`, Free plan, auto-deploy from `main`, public service URL `https://project-vault-byzm.onrender.com`. Latest live deploy remains commit `5f3657cffe0fada2ebb22a32814492dd1c48965c`. Development changes are not deployed. No deployment or settings change was made.
+
+PR #1 and #2 are merged, PR #4 is merged, and PR #3 (Google OAuth error handling) remains open. No PR was merged in this review.
+
+No hosted schema/data/Auth/Storage settings, secrets, merge, deployment, or paid resource was changed. **No user action is required today.**
