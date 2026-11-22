@@ -282,3 +282,12 @@ Development branch adds `20261122110000_revoke_anon_execute_from_security_helper
 
 
 Milestone 2 remains open because hosted migration history is not fully reproducible from the development branch and managed Auth/PostgREST/Storage/Realtime/concurrency acceptance remains incomplete. No hosted schema/data/Auth/Storage setting, secret, merge, deployment, or paid resource was changed.
+
+## 2026-11-22 follow-up — anonymous table-read mismatch
+
+A read-only role simulation against hosted Supabase attempted `SET ROLE anon; SELECT count(*) FROM public.workspaces` and returned `42501 permission denied for function is_workspace_member`. Hosted ACLs deny anon EXECUTE on the SECURITY DEFINER helper while anon still has SELECT grants on all 14 public application tables and ten SELECT policies include anon. This is a permission mismatch causing anonymous reads to fail, not a confirmed data exposure.
+
+Development-only migration `20261122120000_revoke_anonymous_workspace_table_access.sql` now revokes anon SELECT from all 14 application tables and changes those ten policies to authenticated-only. Schema assertions cover the table grants and policy roles. CI run [#44989418918](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44989418918) passed both jobs on review head `7a6787d`. Current development migration count is 14 (main 10, hosted 11); exact hosted migration `restrict_security_definer_function_execution` SQL remains unavailable and the branch/hosted histories remain unreconciled.
+
+
+No hosted schema/data/Auth/Storage setting, secret, merge, deployment, or paid resource was changed. Render recheck remains blocked pending confirmation of the workspace `Sakshamm's workspace`.
