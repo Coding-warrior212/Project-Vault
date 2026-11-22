@@ -386,7 +386,7 @@ No hosted schema/data/Auth/Storage settings, secrets, merge, deployment, or paid
 ### Current GitHub/CI state
 
 - Review began at branch head `b0e4fbb4d04a5f245eeb34c70cd741bca347df7a`; compare was 273 ahead / 3 behind `main`, merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`. Branch protection is disabled.
-- CI run [#44870897526](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44870897526) passed both jobs on code-bearing snapshot `83194cd`; documentation snapshot `68710c5` passed run [#44870897526?](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44870897526) and its actual latest run [#44870897526](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44870897526) (full application + PostgreSQL).
+- Code-bearing snapshot `83194cd` passed both jobs in run [#44870786326](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44870786326). Documentation snapshot `68710c5` passed both jobs in run [#44870897526](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44870897526). The anonymous-helper ACL migration/assertion and runbook update were then included in [#44989057830](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44989057830), which passed both jobs on code-bearing/documentation head `b0e4fbb`.
 - The ACL alignment change adds `20261122110000_revoke_anon_execute_from_security_helpers.sql` and a schema assertion. Run [#44989057830](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44989057830) passed the PostgreSQL job and the server-test/typecheck/build/Playwright application job.
 - Development has 13 migration files; `main` has 10. PR #3 remains open. No merge or deployment was performed.
 
