@@ -1,15 +1,13 @@
-# ProjectVault Round 3 — Milestone Status
+| 8 | Final deployment and submission | Not ready | Render was last verified on 2026-11-21 as Free, auto-deploy from `main`, live commit `5f3657c`. Today's Render read-only lookup requires explicit workspace selection, so the deployment was not freshly rechecked. | Confirm Render workspace to refresh status; after acceptance gates, separately approve any deployment/migration. Finish final PDF, improvements list, technical details, test notes and verified team contributions. |
 
-**Snapshot:** 2026-11-21
+**Snapshot:** 2026-11-22
 **Repository:** `Coding-warrior212/Project-Vault`  
 **Working branch:** `round3-development`  
 **Release constraints:** free-only; preserve `main` and the hosted Supabase project until explicit release approval.
 
 ## Executive status
 
-The development branch has advanced beyond the earlier authentication-only snapshot. It now contains browser Supabase Auth UI, a workspace-scoped cloud data adapter, private Storage upload/download/delete paths, public GitHub documentation snapshots, a derived source-to-claim knowledge graph view, and an isolated browser-local Judge Demo.
-
-**No milestone is fully signed off overall yet.** The Judge Demo acceptance decision is resolved and its browser isolation regression now passes in CI: interactive local edits, default-workspace preservation through entry/exit/reset, and no Supabase write requests during the tested demo flow. Managed Supabase and the other release gates remain open. The last independently verified hosted snapshot (2026-11-15) was empty. Later PR/release notes report eleven hosted migrations and fourteen public tables. The current audit could not recheck the connected project, so the live hosted state is unresolved; do not assume either the old empty state or the later reported migrated state. The earlier GitHub Actions run [#43620652179](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43620652179) passed, but its database runner applied only migration 1. That gap was corrected in later runner changes. Run [#43681406630](https://github.com/Coding-warrior212/Project-Vault/actions/runs/43681406630) passed both jobs on an earlier code snapshot, applying all migration files in PostgreSQL 17 and running server tests, typecheck, build, and smoke assertions. The later code-bearing run [#44244690750](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44244690750) failed both jobs due test-harness syntax defects; three repairs are committed afterward, but the latest CI run on branch head `5fea6371332b475aceec7506119dc3d0c4fa4abf` is **failed** (run #44679254146).
+The development branch contains browser Supabase Auth UI, workspace-scoped cloud persistence, private Storage paths, public GitHub snapshots, a derived evidence graph and an isolated interactive local Judge Demo. **No milestone is fully signed off.** Fresh read-only hosted audit on 2026-11-22 confirms 14 public application tables with RLS enabled, one private capability table, and 11 migration-history entries; this supersedes the earlier empty-schema snapshot. CI run [#44870897526](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44870897526) passed both jobs on the 2026-11-21 code snapshot. The ACL reconciliation migration and assertion added during this review were also validated by run [#44989057830](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44989057830): the PostgreSQL job and application tests/typecheck/build passed, including browser E2E. Hosted compatibility/security sign-off remains open because the migration histories diverge, advisor warnings remain, and full managed role/Auth/Storage/Realtime/concurrency acceptance is incomplete.
 
 ## Eight-milestone tracker
 
@@ -382,3 +380,43 @@ Render service configuration was re-read: `Project-Vault`, Free plan, auto-deplo
 PR #1 and #2 are merged, PR #4 is merged, and PR #3 (Google OAuth error handling) remains open. No PR was merged in this review.
 
 No hosted schema/data/Auth/Storage settings, secrets, merge, deployment, or paid resource was changed. **No user action is required today.**
+
+## 2026-11-22 review — populated hosted audit and ACL alignment
+
+### Current GitHub/CI state
+
+- Review began at branch head `b0e4fbb4d04a5f245eeb34c70cd741bca347df7a`; compare was 273 ahead / 3 behind `main`, merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`. Branch protection is disabled.
+- CI run [#44870897526](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44870897526) passed both jobs on code-bearing snapshot `83194cd`; documentation snapshot `68710c5` passed run [#44870897526?](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44870897526) and its actual latest run [#44870897526](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44870897526) (full application + PostgreSQL).
+- The ACL alignment change adds `20261122110000_revoke_anon_execute_from_security_helpers.sql` and a schema assertion. Run [#44989057830](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44989057830) passed the PostgreSQL job and the server-test/typecheck/build/Playwright application job.
+- Development has 13 migration files; `main` has 10. PR #3 remains open. No merge or deployment was performed.
+
+### Fresh hosted Supabase read-only verification
+
+Project `asjxqshuvepjsqzttafc` was rechecked using the connected read-only Supabase tools on 2026-11-22:
+
+- Migration history: **11 entries** (versions 20261116131337 through 20261116131735). The extra named entry is `restrict_security_definer_function_execution`, which is not present as a migration file in either branch. The two development-only migrations are the atomic owner-membership guard and membership-revocation Broadcast; neither appears in hosted migration history. The exact SQL of the hosted extra migration is unavailable through the migration-list API, so exact history equivalence is unresolved.
+- Application tables: **14 public tables**, all with RLS enabled, plus private `operation_capabilities` (RLS enabled). This supersedes the 2026-11-15 empty-schema snapshot.
+- API roles `anon`, `authenticated`, and `service_role` have no USAGE on `private`; `private.operation_capabilities` table privileges were granted only to `postgres`. Its RLS-enabled/no-policy state is intentional and advisor INFO-level.
+- All public SECURITY DEFINER functions are owned by `postgres` and have fixed `search_path` settings. No anonymous role has EXECUTE on any public SECURITY DEFINER function. Authenticated EXECUTE is present on nine functions: the five RLS helpers (`get_workspace_role`, `has_workspace_role`, `is_authenticated_non_demo`, `is_demo_workspace`, `is_workspace_member`) and four workspace RPCs (`change_workspace_member_role_atomic`, `create_workspace_atomic`, `delete_workspace_atomic`, `transfer_workspace_ownership_atomic`). The helper grants are needed by policies; RPCs require function-level authorization. Advisor warnings remain and are not dismissed by this audit.
+- `supabase_realtime` publication currently contains 11 public tables: `workspaces`, `workspace_members`, `sources`, `claims`, `conflicts`, `missing_info`, `questions`, `handovers`, `activity_events`, `graph_nodes`, and `graph_edges`.
+
+### Current Advisor results
+
+
+**Security:** 9 WARNs for authenticated execution of SECURITY DEFINER helper/RPC functions; 1 WARN for leaked-password protection disabled; 1 INFO for RLS enabled with no policy on `private.operation_capabilities`. The function grants were checked and anon EXECUTE is absent. The 9 authenticated function warnings still require documented function-by-function review. Supabase documentation says leaked-password protection is available on Pro and above; preserve the free-only constraint and do not upgrade. Other password-strength/confirmation settings have not been read-only verified.
+
+**Performance:** 15 unindexed foreign keys and 9 unused indexes. The unused-index report is not a reason to drop indexes on a small, low-traffic dataset. Review the foreign-key indexes later; do not change live indexes.
+
+**Health:** no lints returned.
+
+
+### Development ACL reconciliation
+
+The initial development migration grants anon EXECUTE on `public.is_authenticated_non_demo()` and `public.is_demo_workspace(text)`, while the hosted ACL snapshot revokes anon from both (and all other public SECURITY DEFINER functions). The new development migration revokes only those two anon grants and retains authenticated execution needed by RLS. Schema assertions now test the anon-deny/authenticated-allow invariant. CI run #44989057830 passed the migration and assertion in the disposable PostgreSQL 17 harness. This aligns the observed ACL state; it does **not** reconstruct or prove the exact SQL of the hosted `restrict_security_definer_function_execution` migration.
+
+
+### Milestone disposition and safety
+
+Milestone 2 remains **OPEN — no sign-off**. The hosted schema is now populated, so the earlier empty-schema advisor results are obsolete. Remaining gates include PostgREST transaction-bound capability tests, five-role/cross-workspace isolation, invite replay/expiry/concurrency, Storage, managed Realtime delivery, ownership concurrency, and a reviewed advisor remediation/acceptance record. No hosted schema/data/Auth/Storage setting, secret, deployment, merge, or paid resource was changed.
+
+No user action is required for the database code work. Render status is not freshly verified because its connector requires workspace confirmation; the available workspace is **Sakshamm's workspace**.
