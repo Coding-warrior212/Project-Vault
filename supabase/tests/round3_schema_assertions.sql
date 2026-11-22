@@ -28,6 +28,26 @@ BEGIN
     ]) AND c.relrowsecurity;
   IF v_count <> 14 THEN RAISE EXCEPTION 'RLS must be enabled on all 14 tables; found %',v_count; END IF;
 
+  SELECT count(*) INTO v_count
+  FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+  WHERE n.nspname='public' AND c.relkind='r'
+    AND c.relname = ANY(ARRAY[
+      'profiles','workspaces','workspace_members','workspace_invites','sources',
+      'source_files','claims','conflicts','missing_info','questions','handovers',
+      'activity_events','graph_nodes','graph_edges'
+    ])
+    AND has_table_privilege('anon',c.oid,'SELECT');
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'Anonymous role must not have SELECT on application tables; found %',v_count;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='public' AND cmd='SELECT' AND roles @> ARRAY['anon'::name]
+  ) THEN
+    RAISE EXCEPTION 'Anonymous role must not appear in application SELECT policies';
+  END IF;
+
   IF has_schema_privilege('anon','private','USAGE')
      OR has_schema_privilege('authenticated','private','USAGE')
      OR has_schema_privilege('service_role','private','USAGE') THEN
@@ -62,6 +82,15 @@ BEGIN
      OR NOT has_function_privilege('authenticated','public.is_authenticated_non_demo()','EXECUTE')
      OR NOT has_function_privilege('authenticated','public.is_demo_workspace(text)','EXECUTE') THEN
     RAISE EXCEPTION 'Auth/demo SECURITY DEFINER helper grants must exclude anon and preserve authenticated RLS execution';
+  END IF;
+
+  SELECT p.proname INTO v_bad
+  FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+  WHERE n.nspname='public' AND p.prosecdef
+    AND has_function_privilege('anon',p.oid,'EXECUTE')
+  LIMIT 1;
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION 'Anonymous role must not execute public SECURITY DEFINER function %',v_bad;
   END IF;
 
   IF NOT has_function_privilege('authenticated','public.is_authenticated_non_demo()','EXECUTE')
