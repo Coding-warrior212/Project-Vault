@@ -92,3 +92,7 @@ Migration `20261117110000_require_atomic_owner_membership_changes.sql` denies di
 Migration `20261118100000_membership_revocation_broadcast.sql` sends a private Broadcast to `pv-membership-revoked:<user_id>` after a workspace membership row is deleted. The `realtime.messages` SELECT policy permits only the authenticated user whose UID matches the topic. AuthGate listens on that user-specific private channel, then re-queries memberships through RLS and clears the active workspace if access was revoked.
 
 The local PostgreSQL stand-in records attempted `realtime.send` calls so the smoke test can verify the topic, event, payload, and RLS policy shape. It does not emulate WebSocket delivery or managed Realtime authorization caching. The live DELETE-to-private-Broadcast path must still be tested against managed Supabase before Milestone 2 sign-off.
+
+## Anonymous SECURITY DEFINER helper access
+
+The development branch now includes migration `20261122110000_revoke_anon_execute_from_security_helpers.sql`, which removes anonymous EXECUTE from `public.is_authenticated_non_demo()` and `public.is_demo_workspace(text)`. Authenticated EXECUTE is retained because these helpers are referenced by authenticated RLS policies. The schema assertions verify both sides of this grant boundary. This aligns the branch with the read-only hosted ACL snapshot observed on 2026-11-22; the hosted migration name that changed the grants is known, but its SQL contents were not available through the migration-list API, so exact migration equivalence is not claimed.
