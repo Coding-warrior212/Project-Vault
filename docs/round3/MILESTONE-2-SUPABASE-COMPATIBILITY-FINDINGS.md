@@ -450,7 +450,7 @@ Read-only queries were run against project `asjxqshuvepjsqzttafc` through the co
 
 ### Migration-history reconciliation
 
-At review start, development had 12 migration files, `main` had 10, and hosted history had 11. The two then-existing development-only migrations were `20261117110000_require_atomic_owner_membership_changes` and `20261118100000_membership_revocation_broadcast`. The current development branch adds a third migration absent from hosted history: `20261122110000_revoke_anon_execute_from_security_helpers`. Hosted history contains `restrict_security_definer_function_execution`, which is not present as a migration file on either branch. The exact SQL of that hosted migration is unavailable through the migration-list API; do not infer exact equivalence from its name.
+At review start, development had 12 migration files, `main` had 10, and hosted history had 11. The two then-existing development-only migrations were `20261117110000_require_atomic_owner_membership_changes` and `20261118100000_membership_revocation_broadcast`. The current development branch now has four migration files absent from hosted history: those two plus `20261122110000_revoke_anon_execute_from_security_helpers` and `20261122120000_revoke_anonymous_workspace_table_access`. Hosted history contains `restrict_security_definer_function_execution`, which is not present as a migration file on either branch. The exact SQL of that hosted migration is unavailable through the migration-list API; do not infer exact equivalence from its name.
 
 
 The initial development migration grants anon EXECUTE on `public.is_authenticated_non_demo()` and `public.is_demo_workspace(text)`, while the observed hosted ACL denies anon EXECUTE on both and on every other public SECURITY DEFINER function. A development-only reconciliation migration was added:
@@ -459,7 +459,7 @@ The initial development migration grants anon EXECUTE on `public.is_authenticate
 - It revokes anon from only the two helper functions, retaining authenticated execution for RLS.
 - `supabase/tests/round3_schema_assertions.sql` now verifies that anon cannot execute public SECURITY DEFINER functions and authenticated can execute the two RLS helpers.
 
-Run [#44989057830](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44989057830) passed both jobs on code-bearing snapshot `b0e4fbb`, including all PostgreSQL 17 migrations/assertions/smoke tests, server security tests, typecheck, build, and Playwright E2E. Subsequent documentation-only commits trigger a fresh CI run.
+Run [#44989418918](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44989418918) passed both jobs on review head `7a6787d`, including both new anonymous-access migrations, schema assertions/smoke tests on PostgreSQL 17, server security tests, typecheck, build, and Playwright E2E.
 
 This reconciliation aligns the observed anonymous-execute ACL, but it does **not** reconstruct the exact SQL of the hosted `restrict_security_definer_function_execution` migration. The migration history remains divergent.
 
@@ -468,3 +468,12 @@ This reconciliation aligns the observed anonymous-execute ACL, but it does **not
 Milestone 2 remains **OPEN — no sign-off**. The populated hosted schema is now verified, but the migration history is still not reproducible from the development branch. Remaining gates: PostgREST transaction-bound capability behavior; authenticated/anon/service-role and five-role/cross-workspace matrix; invite expiry/revocation/replay/concurrency; Storage lifecycle; real Realtime private Broadcast delivery and revocation; owner concurrency; and review of advisor warnings/remediation. The free-only leaked-password protection limitation is recorded, not waived.
 
 No hosted schema/data, Auth/Storage setting, secret, merge, deployment, or paid resource was changed. No user action is required for this ACL migration/test work. Render status is not freshly checked because the connector requires explicit workspace confirmation; the listed workspace is `Sakshamm's workspace`.
+
+### Anonymous public-table access mismatch confirmed; development hardening added
+
+The hosted read-only ACL snapshot still grants `anon` SELECT on all 14 public application tables and ten SELECT policies list both `anon` and `authenticated`. However, the same snapshot denies anon EXECUTE on RLS helper functions. A read-only role simulation (`SET ROLE anon; SELECT count(*) FROM public.workspaces`) returned SQLSTATE `42501`, `permission denied for function is_workspace_member`. This is a broken anonymous-read path, not evidence of data leakage.
+
+The development branch assumes the Judge Demo is browser-local and does not require anonymous database reads. Migration `20261122120000_revoke_anonymous_workspace_table_access.sql` revokes anon SELECT from all 14 application tables and changes ten SELECT policies to `authenticated` only. The schema assertions now check that anon has no application-table SELECT privilege, no SELECT policy role, and no public SECURITY DEFINER EXECUTE. Run [#44989418918](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44989418918) passed both jobs on review head `7a6787d`, validating this migration and assertions in the disposable PostgreSQL 17 harness.
+
+
+This is a development-branch correction only. The hosted project still has the anonymous SELECT grants and policies and was not modified. If public anonymous demo access is intended instead, the policy/function grant design must be deliberately rebuilt and tested; do not silently re-enable anon helper execution.
