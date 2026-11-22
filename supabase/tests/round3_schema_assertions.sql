@@ -57,6 +57,13 @@ BEGIN
      OR NOT has_function_privilege('service_role','public.redeem_workspace_invite_by_hash_atomic(uuid,text)','EXECUTE') THEN
     RAISE EXCEPTION 'Invite redemption RPC must be service_role-only';
   END IF;
+  IF has_function_privilege('anon','public.is_authenticated_non_demo()','EXECUTE')
+     OR has_function_privilege('anon','public.is_demo_workspace(text)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.is_authenticated_non_demo()','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.is_demo_workspace(text)','EXECUTE') THEN
+    RAISE EXCEPTION 'Auth/demo SECURITY DEFINER helper grants must exclude anon and preserve authenticated RLS execution';
+  END IF;
+
   IF NOT has_function_privilege('authenticated','public.is_authenticated_non_demo()','EXECUTE')
      OR NOT has_function_privilege('authenticated','public.is_demo_workspace(text)','EXECUTE') THEN
     RAISE EXCEPTION 'Authenticated RLS helper execution privileges are missing';
