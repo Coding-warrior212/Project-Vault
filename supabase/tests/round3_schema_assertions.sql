@@ -57,6 +57,20 @@ BEGIN
      OR NOT has_function_privilege('service_role','public.redeem_workspace_invite_by_hash_atomic(uuid,text)','EXECUTE') THEN
     RAISE EXCEPTION 'Invite redemption RPC must be service_role-only';
   END IF;
+  IF NOT has_function_privilege('authenticated','public.is_authenticated_non_demo()','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.is_demo_workspace(text)','EXECUTE') THEN
+    RAISE EXCEPTION 'Authenticated RLS helper execution privileges are missing';
+  END IF;
+
+  SELECT p.proname INTO v_bad
+  FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+  WHERE n.nspname='public' AND p.prosecdef
+    AND has_function_privilege('anon',p.oid,'EXECUTE')
+  LIMIT 1;
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION 'Anonymous role must not execute public SECURITY DEFINER function %',v_bad;
+  END IF;
+
 
   SELECT p.proname INTO v_bad
   FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
