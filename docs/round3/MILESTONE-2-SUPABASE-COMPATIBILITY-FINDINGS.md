@@ -450,7 +450,7 @@ Read-only queries were run against project `asjxqshuvepjsqzttafc` through the co
 
 ### Migration-history reconciliation
 
-At review start, development had 12 migration files, `main` had 10, and hosted history had 11. Development contains two additional migrations not in hosted history: `20261117110000_require_atomic_owner_membership_changes` and `20261118100000_membership_revocation_broadcast`. Hosted history contains `restrict_security_definer_function_execution`, which is not present as a file on either branch. The exact SQL of that hosted migration is unavailable through the migration-list API; do not infer exact equivalence from its name.
+At review start, development had 12 migration files, `main` had 10, and hosted history had 11. The two then-existing development-only migrations were `20261117110000_require_atomic_owner_membership_changes` and `20261118100000_membership_revocation_broadcast`. The current development branch adds a third migration absent from hosted history: `20261122110000_revoke_anon_execute_from_security_helpers`. Hosted history contains `restrict_security_definer_function_execution`, which is not present as a migration file on either branch. The exact SQL of that hosted migration is unavailable through the migration-list API; do not infer exact equivalence from its name.
 
 
 The initial development migration grants anon EXECUTE on `public.is_authenticated_non_demo()` and `public.is_demo_workspace(text)`, while the observed hosted ACL denies anon EXECUTE on both and on every other public SECURITY DEFINER function. A development-only reconciliation migration was added:
