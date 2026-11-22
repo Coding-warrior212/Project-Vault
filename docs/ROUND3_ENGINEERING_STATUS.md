@@ -272,3 +272,13 @@ References:
 - https://supabase.com/kb/troubleshooting/realtime-warn-sending-broadcast-message
 
 Milestone 2 remains OPEN. No connected Supabase read-only query was run because the Supabase skill registry returned no available skill. No hosted migration, schema/data/Auth/Storage change, deployment, merge, secret change, or paid resource was performed.
+
+## 2026-11-22 review — hosted schema populated and ACL reconciliation
+
+Fresh read-only Supabase audit now verifies 14 public tables with RLS, 11 hosted migration records, a private capability table inaccessible to API roles, 11 Realtime-publication tables, and no anonymous EXECUTE on public SECURITY DEFINER functions. Authenticated EXECUTE remains on nine helpers/RPCs and Security Advisor warns; per-function tests remain required. The Security Advisor also reports leaked-password protection disabled (Supabase docs say Pro+; no upgrade under the free-only constraint). Performance Advisor reports 15 unindexed foreign keys and 9 unused indexes; Health Advisor returned no lints. Full details are in `docs/round3/MILESTONE-2-SUPABASE-COMPATIBILITY-FINDINGS.md`.
+
+
+Development branch adds `20261122110000_revoke_anon_execute_from_security_helpers.sql` and a schema assertion to match the observed anon ACL. Run [#44989057830](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44989057830) passed both jobs on the code-bearing snapshot before this documentation update. The current branch head will need its own CI result.
+
+
+Milestone 2 remains open because hosted migration history is not fully reproducible from the development branch and managed Auth/PostgREST/Storage/Realtime/concurrency acceptance remains incomplete. No hosted schema/data/Auth/Storage setting, secret, merge, deployment, or paid resource was changed.
