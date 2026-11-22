@@ -409,3 +409,62 @@ These results verify the code-bearing snapshot in the CI harness only. **They do
 Render read-only configuration confirms the free service deploys from `main`; its latest live deployment is `5f3657cffe0fada2ebb22a32814492dd1c48965c`. The development branch is not live.
 
 No production migration, data/schema/Auth/Storage change, secret change, merge, deployment, or paid resource was made. No user action is required today.
+
+## 2026-11-22 review — populated hosted audit and function ACL reconciliation
+
+### Fresh read-only hosted state
+
+Read-only queries were run against project `asjxqshuvepjsqzttafc` through the connected Supabase tools on 2026-11-22. No DDL/DML or configuration changes were performed.
+
+
+- Migration history: **11 entries**. Versions/names returned by the migration-list API:
+  - `20261116131337 projectvault_round3`
+  - `20261116131347 atomic_workspace_deletion`
+  - `20261116131412 allow_workspace_delete_capability`
+  - `20261116131415 atomic_workspace_member_role_change`
+  - `20261116131418 preserve_append_only_activity_references`
+  - `20261116131422 workspace_delete_broadcast`
+  - `20261116131429 harden_trigger_function_search_paths`
+  - `20261116131432 optimize_auth_rls_policies`
+  - `20261116131443 add_important_foreign_key_indexes`
+  - `20261116131446 reconcile_activity_event_reference_validation`
+  - `20261116131735 restrict_security_definer_function_execution`
+- Schema: **14 public application tables, all RLS enabled**, plus `private.operation_capabilities` with RLS enabled. This supersedes the historical 2026-11-15 empty-schema snapshot.
+- API roles `anon`, `authenticated`, and `service_role` have no `USAGE` on `private`. The private capability table has no grants to API roles (only `postgres` privileges were listed). The RLS-enabled/no-policy advisor INFO on this table is expected from this inaccessible private table; it is not treated as a public exposure.
+- Public SECURITY DEFINER functions are owned by `postgres` and all have a fixed `search_path`. The ACL snapshot shows no anon EXECUTE on any public SECURITY DEFINER function. Authenticated EXECUTE is granted to nine functions: five helpers (`get_workspace_role`, `has_workspace_role`, `is_authenticated_non_demo`, `is_demo_workspace`, `is_workspace_member`) and four authorized RPCs (`change_workspace_member_role_atomic`, `create_workspace_atomic`, `delete_workspace_atomic`, `transfer_workspace_ownership_atomic`). The helper functions are used in RLS expressions; the RPCs are designed to enforce caller/role checks. Advisor warnings remain and full adversarial function tests are still required.
+- The `supabase_realtime` publication currently contains 11 public tables: `workspaces`, `workspace_members`, `sources`, `claims`, `conflicts`, `missing_info`, `questions`, `handovers`, `activity_events`, `graph_nodes`, and `graph_edges`. `profiles`, `workspace_invites`, and `source_files` are not in the publication. Confirm that this matches the intended client subscription scope during Milestone 4 acceptance.
+
+### Advisor findings (fresh)
+
+**Security**
+- 9 WARNs: authenticated can execute the nine SECURITY DEFINER functions listed above. These are required helper/RPC surface candidates, but the warning is not waived; verify each exposed function's caller/role checks and decide whether some helpers should be moved to a non-exposed schema in a future design.
+- 1 WARN: leaked-password protection disabled. Supabase documentation says this HaveIBeenPwned-based feature is available on Pro and above; preserve the free-only constraint and do not upgrade. Other free password-strength/confirmation controls have not been read-only verified.
+- 1 INFO: `private.operation_capabilities` has RLS enabled but no policy; API schema usage/table grants are denied, which is the intended isolation.
+
+**Performance**
+- 15 unindexed foreign keys: `claims_created_by_fkey`, `claims_flagged_by_user_id_fkey`, `claims_last_reviewed_by_user_id_fkey`, `conflicts_created_by_fkey`, `conflicts_resolved_by_user_id_fkey`, `handovers_approved_by_user_id_fkey`, `missing_info_created_by_fkey`, `missing_info_resolved_by_user_id_fkey`, `questions_answered_by_user_id_fkey`, `questions_created_by_fkey`, `source_files_created_by_fkey`, `sources_created_by_fkey`, `workspace_invites_created_by_fkey`, `workspace_members_added_by_fkey`, and `workspaces_created_by_fkey`.
+- 9 unused indexes: `idx_graph_nodes_ws_claim`, `idx_graph_nodes_ws_source`, `idx_workspaces_is_demo`, `idx_workspace_invites_ws`, `idx_workspace_members_ws_role`, `idx_claims_ws_status`, `idx_graph_nodes_ws_type`, `idx_graph_edges_ws_from`, and `idx_graph_edges_ws_to`. With the small observed data set, usage statistics alone are not grounds to drop indexes. Review later; do not change live indexes in this audit.
+
+**Health:** no lints returned.
+
+
+### Migration-history reconciliation
+
+At review start, development had 12 migration files, `main` had 10, and hosted history had 11. Development contains two additional migrations not in hosted history: `20261117110000_require_atomic_owner_membership_changes` and `20261118100000_membership_revocation_broadcast`. Hosted history contains `restrict_security_definer_function_execution`, which is not present as a file on either branch. The exact SQL of that hosted migration is unavailable through the migration-list API; do not infer exact equivalence from its name.
+
+
+The initial development migration grants anon EXECUTE on `public.is_authenticated_non_demo()` and `public.is_demo_workspace(text)`, while the observed hosted ACL denies anon EXECUTE on both and on every other public SECURITY DEFINER function. A development-only reconciliation migration was added:
+
+- `supabase/migrations/20261122110000_revoke_anon_execute_from_security_helpers.sql`
+- It revokes anon from only the two helper functions, retaining authenticated execution for RLS.
+- `supabase/tests/round3_schema_assertions.sql` now verifies that anon cannot execute public SECURITY DEFINER functions and authenticated can execute the two RLS helpers.
+
+Run [#44989057830](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44989057830) passed both jobs on code-bearing snapshot `b0e4fbb`, including all PostgreSQL 17 migrations/assertions/smoke tests, server security tests, typecheck, build, and Playwright E2E. Subsequent documentation-only commits trigger a fresh CI run.
+
+This reconciliation aligns the observed anonymous-execute ACL, but it does **not** reconstruct the exact SQL of the hosted `restrict_security_definer_function_execution` migration. The migration history remains divergent.
+
+### Current disposition and required gates
+
+Milestone 2 remains **OPEN — no sign-off**. The populated hosted schema is now verified, but the migration history is still not reproducible from the development branch. Remaining gates: PostgREST transaction-bound capability behavior; authenticated/anon/service-role and five-role/cross-workspace matrix; invite expiry/revocation/replay/concurrency; Storage lifecycle; real Realtime private Broadcast delivery and revocation; owner concurrency; and review of advisor warnings/remediation. The free-only leaked-password protection limitation is recorded, not waived.
+
+No hosted schema/data, Auth/Storage setting, secret, merge, deployment, or paid resource was changed. No user action is required for this ACL migration/test work. Render status is not freshly checked because the connector requires explicit workspace confirmation; the listed workspace is `Sakshamm's workspace`.
