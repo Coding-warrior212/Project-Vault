@@ -308,7 +308,7 @@ export async function updateWorkspaceClaim(workspaceId: string, claim: Knowledge
   const ws=requiredWorkspace(workspaceId);
   const {data,error}=await client().from('claims').update({
     verification_status:claim.verificationStatus,human_review_notes:claim.humanReviewNotes ?? null,
-    last_reviewed_by:claim.lastReviewedBy ?? null,last_reviewed_at:iso(claim.lastReviewedAt),
+    last_reviewed_by:claim.lastReviewedBy ?? null,last_reviewed_at:new Date().toISOString(),
     is_flagged:claim.isFlagged ?? false,flagged_at:iso(claim.flaggedAt),
     flagged_by:claim.flaggedBy ?? null,flag_reason:claim.flagReason ?? null,
   }).eq('workspace_id',ws).eq('id',claim.id).select('id');
