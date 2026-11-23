@@ -306,11 +306,12 @@ export async function findWorkspaceDuplicateSourceByHash(workspaceId: string, co
 
 export async function updateWorkspaceClaim(workspaceId: string, claim: KnowledgeClaim) {
   const ws=requiredWorkspace(workspaceId);
-  const {error}=await client().from('claims').update({
+  const {data,error}=await client().from('claims').update({
     verification_status:claim.verificationStatus,human_review_notes:claim.humanReviewNotes ?? null,
-    last_reviewed_by:claim.lastReviewedBy ?? null,last_reviewed_at:claim.lastReviewedAt ?? null,
-    is_flagged:claim.isFlagged ?? false,flagged_at:claim.flaggedAt ?? null,
+    last_reviewed_by:claim.lastReviewedBy ?? null,last_reviewed_at:iso(claim.lastReviewedAt),
+    is_flagged:claim.isFlagged ?? false,flagged_at:iso(claim.flaggedAt),
     flagged_by:claim.flaggedBy ?? null,flag_reason:claim.flagReason ?? null,
-  }).eq('workspace_id',ws).eq('id',claim.id);
+  }).eq('workspace_id',ws).eq('id',claim.id).select('id');
   if(error)throw error;
+  if(!data?.length)throw new Error('Claim was not updated. It may not exist in this workspace or your role may not have permission.');
 }
