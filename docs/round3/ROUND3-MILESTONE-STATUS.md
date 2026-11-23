@@ -431,3 +431,19 @@ The initial development migration grants anon EXECUTE on `public.is_authenticate
 Milestone 2 remains **OPEN — no sign-off**. The hosted schema is now populated, so the earlier empty-schema advisor results are obsolete. Remaining gates include PostgREST transaction-bound capability tests, five-role/cross-workspace isolation, invite replay/expiry/concurrency, Storage, managed Realtime delivery, ownership concurrency, and a reviewed advisor remediation/acceptance record. No hosted schema/data/Auth/Storage setting, secret, deployment, merge, or paid resource was changed.
 
 No user action is required for the database code work. Render status is not freshly verified because its connector requires workspace confirmation; the available workspace is **Sakshamm's workspace**.
+
+## Automation review — 2026-11-23
+
+### Branch and CI evidence (freshly checked)
+- The current development branch head is `7600bc6530bc5d528c61bd59d1163ff34cdd5b1a` (`docs: add anon read mismatch engineering note`). Comparing that SHA to `round3-development` returns **identical** (0 ahead / 0 behind), confirming the branch reference resolves to this snapshot.
+- Compared with `main`, `round3-development` is **285 ahead / 3 behind**, status diverged; merge base remains `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`.
+- The latest code-bearing snapshot `7a6787d6d5f967d710c7115f2860101c3a8a5e03` is verified by GitHub Actions run [#44989544848](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44989544848), with both application and PostgreSQL 17 jobs completed successfully. This includes server security tests, TypeScript, build, Playwright, all 14 migrations, schema assertions, and adversarial smoke tests.
+- The current documentation-only head `7600bc6` has no combined status entries returned by GitHub's status API. The previous green run is evidence for the code-bearing snapshot, not a new run on the documentation head. CI for any subsequent tip must be checked separately.
+
+### Current limitations / blockers
+- Supabase skill is absent from the connected skills registry on this review. No fresh connected Supabase read-only query was run. Hosted migration history, current RLS/ACLs, advisors, Auth, Storage and Realtime remain unverified since the 2026-11-22 snapshot documented above.
+- Render's connector still requires confirmation of workspace `Sakshamm's workspace`; no service/deployment recheck was performed today.
+- Migration counts last documented: 14 development files, 11 hosted history entries, 10 on `main`. The exact hosted-only migration SQL remains unavailable.
+- Milestone 2 remains **OPEN — not signed off**. No milestone is marked complete beyond its explicitly verified acceptance checks.
+
+No code changes, hosted schema/data/Auth/Storage settings, secrets, merge, deployment, or paid resources were changed in this review. No user action is required for development-branch documentation or local verification work.
