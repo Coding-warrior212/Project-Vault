@@ -447,3 +447,18 @@ No user action is required for the database code work. Render status is not fres
 - Milestone 2 remains **OPEN — not signed off**. No milestone is marked complete beyond its explicitly verified acceptance checks.
 
 No code changes, hosted schema/data/Auth/Storage settings, secrets, merge, deployment, or paid resources were changed in this review. No user action is required for development-branch documentation or local verification work.
+
+## 2026-11-23 follow-up — claim review persistence correctness
+
+A source audit found a client persistence issue in `src/services/workspaceCloud.ts`: `updateWorkspaceClaim()` issued an UPDATE without selecting affected rows. PostgREST can return a successful empty response when RLS filters the target row, so the UI's awaited persistence path could treat a no-op as success. `App.tsx` explicitly persists before updating local review state and rolls back in its catch path, so this path now throws when no row is returned.
+
+- Commit `1af01e1b82021ea80adeb5ccb1b931bd2e6f625b`: add `.select('id')` and reject zero-row claim updates.
+- Commit `761d2e77c1d246dbabd8b8458b555d9873d5cc18`: write `last_reviewed_at` as an ISO timestamp. The UI's `'Just now'` label is not a valid database timestamp and is no longer sent to the `timestamptz` column.
+
+The code was re-fetched from GitHub after both commits and the branch comparison against `761d2e7` returned identical. **No dedicated unit test or local runtime test was executed** for this change: the repository is not mounted in this automation environment, and the current commit's combined-status API returned no check entries. The earlier run [#44989544848](https://github.com/Coding-warrior212/Project-Vault/actions/runs/44989544848) passed on code-bearing commit `7a6787d`, but does not cover these two follow-up commits.
+
+Current branch comparison after these changes: **288 ahead / 3 behind `main`**, diverged; merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`.
+
+Supabase skill is unavailable in the connected skills registry, so no fresh hosted query was run. The latest hosted facts are the 2026-11-22 snapshot. Render status remains blocked pending confirmation of workspace `Sakshamm's workspace`. Milestone 2 stays **OPEN — not signed off**.
+
+No hosted schema/data/Auth/Storage settings, secrets, merge, deployment, or paid resource was changed.
