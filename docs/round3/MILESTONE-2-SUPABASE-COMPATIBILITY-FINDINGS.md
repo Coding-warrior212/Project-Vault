@@ -477,3 +477,11 @@ The development branch assumes the Judge Demo is browser-local and does not requ
 
 
 This is a development-branch correction only. The hosted project still has the anonymous SELECT grants and policies and was not modified. If public anonymous demo access is intended instead, the policy/function grant design must be deliberately rebuilt and tested; do not silently re-enable anon helper execution.
+
+## 2026-11-23 application persistence review
+
+The workspace review write path was checked against its caller. `App.tsx` awaits `updateWorkspaceClaim()` before accepting local review state and rolls back on an exception. The adapter now selects the updated row ID and throws if no row is returned, so an RLS-filtered zero-row update is no longer silently treated as successful. The database timestamp is generated as an ISO value rather than persisting the UI label `Just now`.
+
+Commits: `1af01e1b82021ea80adeb5ccb1b931bd2e6f625b` and `761d2e77c1d246dbabd8b8458b555d9873d5cc18`.
+
+Static source review verified the code on GitHub, but no dedicated test or local runtime validation was available in this automation environment. CI status for the new commits has not been returned. This is an application write-correctness fix; it does not close any managed Supabase compatibility/security gate.
