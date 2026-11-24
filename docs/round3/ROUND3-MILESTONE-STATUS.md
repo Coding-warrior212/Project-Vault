@@ -541,7 +541,7 @@ No production migration, live schema/data change, deployment, merge, secret chan
 
 ## 2026-11-24 final CI rerun — current branch test fixture
 
-A later documentation-only commit `2ec3048c35d7ebfd7fe715b44ea0b2107a24b09e` was assembled from an earlier tree and inadvertently restored the malformed single-dollar role-block delimiters in `supabase/tests/local-bootstrap.sql`. Its run [#45336027970](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45336027970) correctly failed at bootstrap, before migrations. The fixture was corrected again on the actual current branch tip in commit `c8a78b998ec29ef90962bed2c05ee33a71b33f23`.
+A later documentation-only commit `2ec3048c35d7ebfd7fe715b44ea0b2107a24b09e` was assembled from an earlier tree and inadvertently restored the malformed single-dollar role-block delimiters in `supabase/tests/local-bootstrap.sql`. Its database job failed at bootstrap before migrations; the overall run was subsequently cancelled when the corrected follow-up push superseded it. The fixture was corrected again on the actual current branch tip in commit `c8a78b998ec29ef90962bed2c05ee33a71b33f23`.
 
 Run [#45336112302](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45336112302) completed successfully on `c8a78b9`: both jobs passed, including the Supabase-default-ACL-seeded PostgreSQL 17 migration/assertion/adversarial suite and the application security tests, TypeScript, build, and Playwright browser tests. This is the latest verified code/test snapshot. The documentation follow-up itself is separate and does not change application or SQL behavior.
 
