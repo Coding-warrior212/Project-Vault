@@ -560,3 +560,12 @@ No production migration, live schema/data change, deployment, merge, secret chan
 - This is a green local/disposable PostgreSQL and application CI result. It is **not** managed Supabase/PostgREST/Auth/Storage/Realtime acceptance.
 - Current branch comparison: **292 ahead / 3 behind `main`**, diverged; merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`. Development has 15 migration files, `main` has 10, hosted history has 11.
 - Milestone 2 remains **OPEN — not signed off**. No hosted migration, live schema/data/Auth/Storage change, deployment, merge, secret change, or paid resource was performed.
+
+
+## 2026-11-24 final CI rerun — current branch test fixture
+
+A later documentation-only commit `2ec3048c35d7ebfd7fe715b44ea0b2107a24b09e` was assembled from an earlier tree and inadvertently restored the malformed single-dollar role-block delimiters in `supabase/tests/local-bootstrap.sql`. Its run [#45336027970](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45336027970) correctly failed at bootstrap, before migrations. The fixture was corrected again on the actual current branch tip in commit `c8a78b998ec29ef90962bed2c05ee33a71b33f23`.
+
+Run [#45336112302](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45336112302) completed successfully on `c8a78b9`: both jobs passed, including the Supabase-default-ACL-seeded PostgreSQL 17 migration/assertion/adversarial suite and the application security tests, TypeScript, build, and Playwright browser tests. This is the latest verified code/test snapshot. The documentation follow-up itself is separate and does not change application or SQL behavior.
+
+The branch remains diverged from `main`; Milestone 2 remains **OPEN — no managed Supabase sign-off**. The hosted default ACLs and 11-entry migration history remain unchanged because no hosted migration was applied.
