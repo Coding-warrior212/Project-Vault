@@ -100,3 +100,12 @@ The development branch now includes migration `20261122110000_revoke_anon_execut
 ## Anonymous API access is disabled
 
 The Judge Demo is browser-local; public Supabase read access is not part of the intended demo path. Migration `20261122120000_revoke_anonymous_workspace_table_access.sql` removes `anon` SELECT on all 14 public application tables and changes the demo-readable SELECT policies to `authenticated` only. Authenticated users can still read demo rows through the existing RLS expressions and their workspace data through membership/role policies. The schema assertions verify no anonymous SELECT table grants or anon SELECT-policy roles remain, and no anon EXECUTE on public SECURITY DEFINER functions remains. This avoids the permission error observed in the hosted read-only role simulation where anon SELECT on `workspaces` attempted to invoke `is_workspace_member`, which anon cannot execute. The migration is development-only and has not been applied to hosted Supabase.
+
+
+## Supabase public-schema default ACL parity
+
+The disposable bootstrap now seeds the Supabase-style default privileges granted to the `postgres` migration owner in `public` (API-role table, sequence, and function grants). This is intentional: without it, vanilla PostgreSQL defaults would make the ACL regression test pass without exercising the hosted Supabase condition.
+
+Migration `20261124110000_restrict_public_default_privileges.sql` revokes inherited API-role defaults for future public tables, sequences, and functions. It also normalizes the existing public SECURITY DEFINER function ACLs to the reviewed helper/RPC allowlist. New public objects must receive explicit, narrowly scoped grants from their own migration.
+
+The migration and assertions are development-branch only. Do not apply them to hosted Supabase until the full migration-history reconciliation and Milestone 2 acceptance process is complete.

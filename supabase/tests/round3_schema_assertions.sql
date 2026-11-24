@@ -195,6 +195,79 @@ BEGIN
     RAISE EXCEPTION 'Membership revocation trigger must send a targeted Realtime broadcast';
   END IF;
 
+  -- Supabase's postgres-owned public defaults must not re-expose future
+  -- application objects to API roles. The local bootstrap seeds these grants
+  -- before migrations so this assertion verifies an actual revoke.
+  IF EXISTS (
+    SELECT 1
+    FROM pg_default_acl d
+    CROSS JOIN LATERAL aclexplode(d.defaclacl) a
+    WHERE d.defaclrole = 'postgres'::regrole
+      AND d.defaclnamespace = 'public'::regnamespace
+      AND d.defaclobjtype IN ('r', 'S', 'f')
+      AND a.grantee IN (
+        'anon'::regrole,
+        'authenticated'::regrole,
+        'service_role'::regrole
+      )
+  ) THEN
+    RAISE EXCEPTION 'Postgres public default ACLs must not grant tables, sequences, or functions to API roles';
+  END IF;
+
+  -- The hosted SECURITY DEFINER allowlist is intentional: internal trigger
+  -- functions are not directly executable by API roles.
+  SELECT p.proname INTO v_bad
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public'
+    AND p.prosecdef
+    AND has_function_privilege('authenticated', p.oid, 'EXECUTE')
+    AND p.proname NOT IN (
+      'change_workspace_member_role_atomic',
+      'create_workspace_atomic',
+      'delete_workspace_atomic',
+      'get_workspace_role',
+      'has_workspace_role',
+      'is_authenticated_non_demo',
+      'is_demo_workspace',
+      'is_workspace_member',
+      'transfer_workspace_ownership_atomic'
+    )
+  LIMIT 1;
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION 'Unexpected authenticated SECURITY DEFINER execution grant on %', v_bad;
+  END IF;
+
+  SELECT p.proname INTO v_bad
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public'
+    AND p.prosecdef
+    AND has_function_privilege('service_role', p.oid, 'EXECUTE')
+    AND p.proname NOT IN (
+      'broadcast_workspace_delete',
+      'change_workspace_member_role_atomic',
+      'create_workspace_atomic',
+      'get_workspace_role',
+      'has_workspace_role',
+      'is_authenticated_non_demo',
+      'is_demo_workspace',
+      'is_workspace_member',
+      'redeem_workspace_invite_by_hash_atomic',
+      'transfer_workspace_ownership_atomic'
+    )
+  LIMIT 1;
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION 'Unexpected service_role SECURITY DEFINER execution grant on %', v_bad;
+  END IF;
+
+  IF has_function_privilege('service_role', 'public.delete_workspace_atomic(text)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.broadcast_workspace_delete()', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.broadcast_workspace_delete()', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'public.broadcast_workspace_delete()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Workspace deletion/broadcast RPC grants do not match the reviewed role boundary';
+  END IF;
+
   RAISE NOTICE 'ProjectVault Round 3 schema assertions passed.';
 END;
 $$;

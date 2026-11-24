@@ -462,3 +462,66 @@ Current branch comparison after these changes: **288 ahead / 3 behind `main`**, 
 Supabase skill is unavailable in the connected skills registry, so no fresh hosted query was run. The latest hosted facts are the 2026-11-22 snapshot. Render status remains blocked pending confirmation of workspace `Sakshamm's workspace`. Milestone 2 stays **OPEN — not signed off**.
 
 No hosted schema/data/Auth/Storage settings, secrets, merge, deployment, or paid resource was changed.
+
+
+## 2026-11-24 review — fresh hosted audit and default-ACL migration gap
+
+### GitHub branch and CI (verified)
+
+- Repository: `Coding-warrior212/Project-Vault`; development branch head before this review: `5422a0400ea1f8d018bc36ae669cfc33d712f1e0`.
+- Branch comparison: **290 ahead / 3 behind `main`**, status `diverged`; merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`.
+- Checked-in migrations before this review: **14 development / 10 main**.
+- GitHub Actions run [#45119603654](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45119603654) completed successfully on head `5422a040`; both application and PostgreSQL 17 jobs passed. This includes the claim-update RLS no-op handling and ISO review timestamp commits. It does not validate managed Supabase behavior.
+- Branch protection is disabled. PR #3 (Google OAuth startup error handling) remains open; no PR was merged in this review.
+
+### Fresh connected Supabase read-only snapshot
+
+Project `asjxqshuvepjsqzttafc` is `ACTIVE_HEALTHY`, PostgreSQL `17.11.0.019`, region `ap-northeast-2`. The connected project was queried read-only; no DDL, DML, configuration, Auth, Storage, or secret changes were made.
+
+- Hosted migration history has **11 entries**: the ten migrations matching the main branch plus `restrict_security_definer_function_execution`, whose exact SQL is not present in either branch.
+- The hosted public schema has **14 application tables; RLS is enabled on 14/14**. `FORCE ROW LEVEL SECURITY` is false on all 14; API-role access still goes through RLS, while owner/service-role operations must be reviewed separately.
+- All 14 application tables are owned by `postgres`; the read-only migration session reports `current_user = postgres`. The current role is not a member of `supabase_admin`.
+- Hosted ACL still grants `anon` SELECT on all 14 public application tables, and ten SELECT policies still list `anon, authenticated`. At the same time, anon EXECUTE is denied on every public SECURITY DEFINER function. The previous `SET ROLE anon` read of `public.workspaces` failed with SQLSTATE `42501` on `is_workspace_member`; this is an inconsistent, failing anonymous path, not evidence of data disclosure. Development migration `20261122120000_revoke_anonymous_workspace_table_access.sql` addresses existing table grants/policies, but it has not been applied to hosted Supabase.
+- Private schema usage is denied to anon/authenticated/service_role; `private.operation_capabilities` has no API-role table access.
+- Hosted public SECURITY DEFINER functions are postgres-owned with fixed search paths. The reviewed execution matrix is: nine functions executable by authenticated; ten by service_role (including server-only invite redemption and workspace-delete broadcast); none by anon. Security Advisor reports the expected nine authenticated SECURITY DEFINER warnings, which remain subject to per-function review.
+- Hosted `workspace_members` DELETE policy still permits self-removal and owner/admin removal. Its installed `enforce_workspace_member_guards()` definition does not contain the development-only `OWNER_DELETE_REQUIRES_TRANSFER` guard. The AFTER trigger counts remaining owners but does not itself prove safe two-session serialization. The owner-guard migration is not hosted; concurrent owner-removal/transfer remains a critical managed acceptance gate.
+- The hosted `supabase_realtime` publication contains 11 public tables. The private per-user membership-revocation Broadcast migration/trigger from development is not in hosted migration history; actual revocation delivery remains unverified.
+- The `projectvault-sources` bucket is private, 50 MiB maximum, and allows PDF, Markdown, plain text, and octet-stream. Its object policies allow member reads, owner/admin/editor inserts and deletes, and deny UPDATE. Actual Storage API lifecycle tests remain pending.
+- Security Advisor: 9 authenticated SECURITY DEFINER warnings; 1 leaked-password-protection warning; 1 informational private-table/no-policy finding (expected for the inaccessible capability table).
+- Performance Advisor: 15 unindexed foreign keys and 9 unused indexes. These are informational; do not drop indexes solely from low usage in this small project.
+- Health Advisor: no lints.
+
+### New critical migration-compatibility finding: default privileges
+
+The hosted `pg_default_acl` for role `postgres` in schema `public` grants `anon`, `authenticated`, and `service_role` broad default privileges on future tables and sequences, plus EXECUTE on future functions. This is directly relevant because all 14 application tables are owned by `postgres` and the migration session is `postgres`.
+
+The existing development migrations revoke current anon SELECT grants and two helper-function grants, but do not remove the postgres-owned default ACLs. As a result, future public tables/functions/sequences created by later migrations could inherit API-role privileges even after the current-object hardening. The local bootstrap also previously did not emulate Supabase's default ACLs, so the local assertions could not detect this compatibility gap.
+
+### Development-only remediation committed
+
+This review adds `20261124110000_restrict_public_default_privileges.sql` to `round3-development`:
+
+- Revokes default table, sequence, and function privileges for PUBLIC/anon/authenticated/service_role from future `postgres`-owned public objects.
+- Normalizes existing public SECURITY DEFINER functions to the observed hosted allowlist: nine authenticated helpers/RPCs, ten service_role functions, no anon execution.
+- Leaves Supabase-managed `supabase_admin` defaults untouched; the current migration owner is `postgres` and is not a member of `supabase_admin`.
+
+The local bootstrap now seeds Supabase-style postgres/public default grants before migrations. Schema assertions verify those defaults are removed and that the SECURITY DEFINER allowlist is preserved. The local runbook documents the new fail-closed default.
+
+This migration is **development-only**. No hosted migration was applied. The next GitHub Actions run must pass before this change is called locally verified; managed PostgREST, Auth, Storage, Realtime, role/tenant, invite and two-session owner-concurrency tests remain open.
+
+### Updated migration reconciliation
+
+After this review's new migration: **15 development files / 10 main files / 11 hosted migration records**. Five development migrations are not represented in hosted history: owner guard, membership-revocation Broadcast, anonymous helper/table ACL hardening, and public default-privilege hardening. Hosted history still has the extra `restrict_security_definer_function_execution` entry with unavailable SQL. Do not replay or apply anything to hosted Supabase to reconcile this automatically.
+
+### Milestone disposition
+
+- M1: substantial implementation and green CI; branch divergence and disabled protection remain governance risks.
+- M2: **OPEN — no sign-off**. The default-ACL gap is now covered by a development migration/test, but managed migration history, PostgREST capability behavior, full role/tenant matrix, invite replay/expiry/concurrency, Storage, Realtime and owner concurrency remain.
+- M3: auth/RBAC implementation exists; hosted Google OAuth/email and all-role acceptance remain.
+- M4: cloud persistence/Realtime implementation exists; managed Storage/Realtime and local-to-cloud import acceptance remain.
+- M5: shared workspace, public GitHub sync and evidence graph exist; private GitHub OAuth/background sync and automatic impact propagation remain.
+- M6: interactive browser-local Judge Demo isolation is verified; it is not read-only.
+- M7: CI passed on `5422a040`; managed security/E2E matrix remains.
+- M8: not ready; final managed acceptance evidence, PDF, improvements/technical notes and verified team contributions remain.
+
+No production migration, live schema/data change, deployment, merge, secret change, or paid resource was used. No user action is required for today's development-branch work.
