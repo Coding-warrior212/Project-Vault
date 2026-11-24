@@ -291,3 +291,14 @@ Development-only migration `20261122120000_revoke_anonymous_workspace_table_acce
 
 
 No hosted schema/data/Auth/Storage setting, secret, merge, deployment, or paid resource was changed. Render recheck remains blocked pending confirmation of the workspace `Sakshamm's workspace`.
+
+## 2026-11-24 CI verification follow-up
+
+- The first run after adding the default-ACL regression coverage, [#45335729240](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45335729240), failed before applying migrations because the local bootstrap role declarations had malformed single-dollar PL/pgSQL delimiters. This was a test-fixture syntax defect, not a migration failure.
+- Corrected the bootstrap delimiters in commit `6bc4709a81b8794fb56dac1746f2c1d560c2c737`.
+- The fresh run [#45335837432](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45335837432) then completed **successfully on the current code-bearing branch head**. Both jobs passed:
+  - PostgreSQL 17: all 15 development migrations applied; schema assertions (including Supabase-style default ACL revocation and the SECURITY DEFINER allowlist) and adversarial smoke tests passed.
+  - Application: server security tests, TypeScript type-check, production build, and Playwright E2E passed (4/4 browser tests).
+- This is a green local/disposable PostgreSQL and application CI result. It is **not** managed Supabase/PostgREST/Auth/Storage/Realtime acceptance.
+- Current branch comparison: **292 ahead / 3 behind `main`**, diverged; merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`. Development has 15 migration files, `main` has 10, hosted history has 11.
+- Milestone 2 remains **OPEN — not signed off**. No hosted migration, live schema/data/Auth/Storage change, deployment, merge, secret change, or paid resource was performed.
