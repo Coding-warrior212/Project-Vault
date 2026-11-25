@@ -1,25 +1,25 @@
 # ProjectVault Round 3 — Milestone Status
 
-**Snapshot:** 2026-11-22  
+**Snapshot:** 2026-11-25  
 **Repository:** `Coding-warrior212/Project-Vault`  
 **Working branch:** `round3-development`  
 **Release constraints:** free-only; do not modify live Supabase schema/data, deploy, merge, or change secrets.
 
 ## Executive status
 
-The current read-only hosted audit confirms ProjectVault's Supabase project is populated (14 public application tables with RLS, 11 migration-history entries, and a private capability table), superseding the earlier empty-schema snapshot. A read-only `SET ROLE anon` query against `public.workspaces` fails with `permission denied for function is_workspace_member`, confirming an inconsistent anonymous table-grant/policy/function-execute path. Development now disables anonymous table reads and removes anon from demo SELECT policies; these changes passed CI. **No milestone is fully signed off.**
+The latest read-only audit confirms the hosted Supabase project is healthy and populated (14 public application tables, all 14 RLS-enabled, 56 policies, 11 migration-history entries, and an inaccessible private capability schema). The hosted project still grants `anon` SELECT on all 14 application tables and its postgres-owned `public` default ACLs grant API roles broad privileges on future tables, sequences, and functions. The development branch contains migrations to remove those grants, but they have not been applied to the hosted project. The hosted membership DELETE policy still permits owner rows and its trigger function lacks the branch's explicit atomic-transfer guard; this is a high-priority live concurrency/access-control gap. **No milestone is fully signed off.**
 
 ## Eight-milestone tracker
 
 | # | Milestone | Status | Verified progress | Remaining gates |
 |---|---|---|---|---|
-| 1 | Development foundation | In progress | Review head `7a6787d`; 282 ahead / 3 behind `main`, merge base `67cd33b`. Branch protection disabled. PRs #1, #2 and #4 merged; #3 open. | Reconcile diverged history; decide branch governance; review bundle-size warning. |
-| 2 | Supabase foundation | **Open — no sign-off** | Fresh hosted audit: 14 public tables all RLS-enabled, 11 migration records, private capability table inaccessible to API roles. Hosted ACL denies anon EXECUTE on all public SECURITY DEFINER functions. Dev adds anonymous-function and table-access hardening; CI run #44989418918 passed both jobs. | Reconcile 14 dev migrations / 11 hosted / 10 main; exact hosted extra migration SQL unavailable. Review 9 authenticated SECURITY DEFINER warnings and leaked-password warning. Complete PostgREST capability, role/tenant, Auth, invite, Storage, Realtime and concurrency matrix. |
+| 1 | Development foundation | In progress | Current head `22c23fc`; 296 ahead / 3 behind `main`, merge base `67cd33b`. Branch protection disabled. PRs #1, #2 and #4 merged; #3 remains open against `main` from a separate branch. | Reconcile diverged history; decide branch governance; review bundle-size warning. |
+| 2 | Supabase foundation | **Open — no sign-off** | Fresh hosted audit: 14 public tables all RLS-enabled, 56 policies, 11 hosted migration records, private schema inaccessible to API roles. `anon` has SELECT grants on all 14 app tables; postgres-owned `public` defaults grant anon/authenticated/service_role table, sequence and function privileges. 23 public SECURITY DEFINER functions: 0 anon EXECUTE, 9 authenticated, 10 service_role. Dev contains ACL and owner-guard hardening; neither is hosted. | Reconcile 15 dev migrations / 11 hosted / 10 main; hosted-only migration `restrict_security_definer_function_execution` SQL unavailable. Remove hosted anon/default ACL drift only through separately approved release; close owner-delete/last-owner race; review 9 authenticated SECURITY DEFINER warnings and leaked-password warning. Complete PostgREST capability, role/tenant, Auth, invite, Storage, Realtime and concurrency matrix. |
 | 3 | Authentication and RBAC | In progress | Browser Auth flows and server invite validation exist; OAuth startup error handling improved. | Verify live Google/email settings, confirmation/reset flows, invite RPC, all five roles and outsider isolation. |
 | 4 | Cloud persistence and Realtime | Partial | Cloud data adapter, private Storage operations, handover persistence and Realtime subscriptions exist. Hosted publication currently includes 11 tables. | Verify managed Storage and Broadcast delivery/revocation, subscriptions, conflict/error handling, and local-to-cloud import preservation. |
 | 5 | Three promised improvements | Partial | Shared workspace/invite foundation, public GitHub manual sync, derived source-to-claim evidence graph. | Private-repo OAuth/background sync and automated dependency/change-impact/staleness propagation are not implemented. |
 | 6 | Judge Demo | **Browser isolation verified** | Interactive browser-local demo; tested edits/uploads remain isolated from default workspace and Supabase. CI E2E passed. | Keep regression. Do not describe it as read-only or as managed-backend security proof. |
-| 7 | Security and E2E | CI green; managed tests open | Run #44989418918 passed server tests, typecheck, production build, Playwright, full PostgreSQL 17 migrations, schema assertions and smoke tests on review head `7a6787d`. | Full managed role/tenant matrix, invite/owner concurrency, Storage/Realtime and Gemini authorization acceptance. |
+| 7 | Security and E2E | CI green; managed tests open | Latest branch-head run #45336401118 on `22c23fc` passed both jobs: PostgreSQL 17 full 15-migration/schema/adversarial suite and application server tests, typecheck, production build and Playwright E2E. | Full managed role/tenant matrix, invite/owner concurrency, Storage/Realtime and Gemini authorization acceptance. |
 | 8 | Final deployment and submission | Not ready | Live service last verified 2026-11-21: Render Free, auto-deploy from `main`, live commit `5f3657c`. Render could not be rechecked today because workspace selection requires confirmation. | Confirm Render workspace for read-only recheck. After gates, separately approve deployment/migration. Finish final PDF, improvements list, technical details, test notes and verified team contributions. |
 
 ## Fresh hosted findings — 2026-11-22
@@ -546,3 +546,42 @@ A later documentation-only commit `2ec3048c35d7ebfd7fe715b44ea0b2107a24b09e` was
 Run [#45336112302](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45336112302) completed successfully on `c8a78b9`: both jobs passed, including the Supabase-default-ACL-seeded PostgreSQL 17 migration/assertion/adversarial suite and the application security tests, TypeScript, build, and Playwright browser tests. This is the latest verified code/test snapshot. The documentation follow-up itself is separate and does not change application or SQL behavior.
 
 The branch remains diverged from `main`; Milestone 2 remains **OPEN — no managed Supabase sign-off**. The hosted default ACLs and 11-entry migration history remain unchanged because no hosted migration was applied.
+
+
+## Latest automated review — 2026-11-25
+
+### Repository and CI — verified
+
+- `round3-development` head: `22c23fcff1d1329b0a119c82d611686e9c4596e6` (documentation commit; parent `9a6f2e1`). Branch protection is disabled.
+- GitHub compare: **296 ahead / 3 behind `main`**, diverged; merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`.
+- Migration files: **15** on development, **10** on main, **11** in hosted migration history. Ten migration names are shared. Five development-only files are: `require_atomic_owner_membership_changes`, `membership_revocation_broadcast`, `revoke_anon_execute_from_security_helpers`, `revoke_anonymous_workspace_table_access`, and `restrict_public_default_privileges`. Hosted history has an additional `restrict_security_definer_function_execution` entry (version `20261116131735`) whose source SQL is not present in either branch.
+- Latest branch-head workflow [#45336401118](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45336401118) completed successfully on 2026-11-24: both the PostgreSQL 17 migration/adversarial job and the application security/typecheck/build/Playwright job passed. This is disposable local PostgreSQL and browser CI, not managed Supabase acceptance.
+- PR #1, #2 and #4 are merged. PR #3 is open, targeting `main` from `fix/oauth-invite-reliability`; it is not the `round3-development` branch. No PR was merged in this review.
+
+### Hosted Supabase — read-only, 2026-11-25
+
+Project `asjxqshuvepjsqzttafc` is `ACTIVE_HEALTHY`, PostgreSQL 17.11.0.019, region `ap-northeast-2`.
+
+- 14 public application tables; RLS enabled on 14/14; 56 public policies; hosted migration history has 11 entries.
+- `anon` has table-level SELECT privilege on all 14 application tables. RLS still governs row visibility; this ACL fact alone is not proof of cross-workspace data disclosure. A prior read-only `SET ROLE anon` read of `public.workspaces` failed with SQLSTATE 42501 because `is_workspace_member` was not executable by anon.
+- Postgres-owned `public` default ACLs currently grant broad table privileges to `anon`, `authenticated`, and `service_role`; sequence SELECT/UPDATE/USAGE to the same API roles; and function EXECUTE to the same roles. No global default ACL entries were returned. The development migration `20261124110000_restrict_public_default_privileges.sql` targets these observed schema-scoped defaults; it has not been applied to the hosted project.
+- 23 public SECURITY DEFINER functions; 0 are executable by anon, 9 by authenticated, and 10 by service_role. No SECURITY DEFINER procedures were found. The nine authenticated functions are the intended workspace helper/RPC surface but remain under review.
+- API roles have no USAGE on the `private` schema. The `projectvault-sources` Storage bucket is private, with a 50 MiB limit and PDF/Markdown/plain-text/octet-stream MIME allowlist. Storage API lifecycle behavior was not exercised.
+- The `supabase_realtime` publication contains 11 tables. The development membership-revocation Broadcast migration is not in hosted history; actual WebSocket delivery remains unverified.
+
+### Confirmed hosted owner-removal gap — high priority
+
+The hosted `workspace_members_delete_policy` does **not** contain the branch's `role <> 'owner'` restriction. The hosted `enforce_workspace_member_guards()` definition does **not** contain `OWNER_DELETE_REQUIRES_TRANSFER`. The hosted `enforce_owner_minimum_after_change()` counts owners after the row change without taking a parent-workspace lock. The hosted `transfer_workspace_ownership_atomic()` does lock membership rows in deterministic order, but that does not replace the missing hosted direct-owner-delete guard. This leaves a static concurrent-owner-removal risk; it has not been reproduced with two live sessions.
+
+Development migration `20261117110000_require_atomic_owner_membership_changes.sql` adds both the owner-excluding DELETE policy and the trigger-level guard. The local adversarial suite verifies sequential direct-owner deletion denial and transfer, but does not yet prove the two-session race is closed. Do not apply the migration to the hosted project in this automation.
+
+### Current Advisor snapshot — 2026-11-25
+
+- Security: 9 authenticated SECURITY DEFINER warnings; 1 leaked-password-protection warning; 1 informational RLS/no-policy finding for the private capability table.
+- Performance: 15 unindexed foreign keys and 9 unused-index notices.
+- Health: no lints.
+- Leaked-password protection remains a free-tier limitation; do not upgrade or incur paid costs.
+
+### Disposition
+
+Milestone 2 remains **OPEN — not signed off**. The hosted anonymous/default ACLs, owner-removal policy/trigger gap, migration-history mismatch, and missing managed Auth/Storage/Realtime/PostgREST/concurrency tests remain blockers. No hosted schema/data/Auth/Storage setting, deployment, merge, secret, or paid resource was changed.

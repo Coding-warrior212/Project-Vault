@@ -311,3 +311,14 @@ A later documentation-only commit `2ec3048c35d7ebfd7fe715b44ea0b2107a24b09e` was
 Run [#45336112302](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45336112302) completed successfully on `c8a78b9`: both jobs passed, including the Supabase-default-ACL-seeded PostgreSQL 17 migration/assertion/adversarial suite and the application security tests, TypeScript, build, and Playwright browser tests. This is the latest verified code/test snapshot. The documentation follow-up itself is separate and does not change application or SQL behavior.
 
 The branch remains diverged from `main`; Milestone 2 remains **OPEN — no managed Supabase sign-off**. The hosted default ACLs and 11-entry migration history remain unchanged because no hosted migration was applied.
+
+
+## Automation review — 2026-11-25
+
+- Branch `round3-development` head `22c23fcff1d1329b0a119c82d611686e9c4596e6`; 296 ahead / 3 behind `main`, merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`; branch protection disabled.
+- Latest branch-head CI run [#45336401118](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45336401118) passed both jobs: 15-migration PostgreSQL 17 schema/adversarial suite and application server tests, typecheck, production build, and Playwright E2E.
+- Migration counts: development 15, main 10, hosted history 11. The hosted-only history name `restrict_security_definer_function_execution` has no source SQL in the repository.
+- Fresh read-only Supabase audit: 14/14 public tables RLS-enabled, 56 policies, anon SELECT grants on all 14 app tables, broad postgres-owned `public` default ACLs, 23 public SECURITY DEFINER functions (0 anon, 9 authenticated, 10 service_role), and no private-schema USAGE for API roles.
+- Confirmed live owner-removal mismatch: hosted member DELETE policy lacks `role <> 'owner'`; hosted member trigger lacks `OWNER_DELETE_REQUIRES_TRANSFER`. Development migration `20261117110000_require_atomic_owner_membership_changes.sql` contains both protections, but has not been applied to hosted Supabase. A two-session race test remains missing.
+- Current Advisors: Security 9 authenticated SECURITY DEFINER warnings, 1 leaked-password warning, 1 informational private capability-table finding; Performance 15 unindexed FKs and 9 unused indexes; Health no lints.
+- Milestone 2 remains OPEN. CI is local/disposable evidence only, not managed Supabase sign-off. No live schema/data/Auth/Storage change, deployment, merge, secret change, or paid resource was performed.

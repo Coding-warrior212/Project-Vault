@@ -1,6 +1,6 @@
 # ProjectVault Round 3 — Supabase Compatibility Findings
 
-**Reviewed:** 2026-11-14  
+**Reviewed:** 2026-11-25 (latest hosted audit; earlier dated sections are historical)  
 **Branch:** `round3-development`  
 **Status:** Review notes — do not apply migration to the hosted project.
 
@@ -569,3 +569,38 @@ A later documentation-only commit `2ec3048c35d7ebfd7fe715b44ea0b2107a24b09e` was
 Run [#45336112302](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45336112302) completed successfully on `c8a78b9`: both jobs passed, including the Supabase-default-ACL-seeded PostgreSQL 17 migration/assertion/adversarial suite and the application security tests, TypeScript, build, and Playwright browser tests. This is the latest verified code/test snapshot. The documentation follow-up itself is separate and does not change application or SQL behavior.
 
 The branch remains diverged from `main`; Milestone 2 remains **OPEN — no managed Supabase sign-off**. The hosted default ACLs and 11-entry migration history remain unchanged because no hosted migration was applied.
+
+
+## Latest connected Supabase audit — 2026-11-25
+
+This section supersedes older statements in this file about the hosted project being empty. The connected project is currently active and populated; no write operation was performed.
+
+### Hosted project facts
+
+- Project: `asjxqshuvepjsqzttafc`; status `ACTIVE_HEALTHY`; PostgreSQL 17.11.0.019; region `ap-northeast-2`.
+- 14 public application tables, all 14 with RLS enabled; 56 public policies; 11 hosted migration-history entries.
+- `anon` has SELECT grants on all 14 application tables. RLS remains the row-level control; the grant alone does not prove cross-workspace disclosure. A previous read-only anonymous workspace query failed with SQLSTATE 42501 because the policy path invokes `is_workspace_member`, which anon cannot execute.
+- `pg_default_acl` shows postgres-owned, schema-scoped `public` defaults granting broad table privileges, sequence SELECT/UPDATE/USAGE, and function EXECUTE to anon/authenticated/service_role. No global default ACL rows were returned. These defaults remain live because no migration was applied.
+- 23 public SECURITY DEFINER functions; anon EXECUTE count 0; authenticated EXECUTE count 9; service_role EXECUTE count 10; no SECURITY DEFINER procedures. Private schema USAGE is denied to anon, authenticated, and service_role.
+- Realtime publication contains 11 tables. The source bucket `projectvault-sources` is private, capped at 50 MiB, and allows PDF, Markdown, plain text, and octet-stream MIME types.
+- Current advisors: 9 authenticated SECURITY DEFINER warnings, 1 leaked-password-protection warning, 1 informational private-table/no-policy finding; 15 unindexed foreign keys; 9 unused-index notices; no Health Advisor lints.
+
+### Hosted owner-removal policy mismatch
+
+The hosted `workspace_members_delete_policy` currently has no `role <> 'owner'` predicate. The hosted `enforce_workspace_member_guards()` lacks the explicit `OWNER_DELETE_REQUIRES_TRANSFER` guard present in development migration `20261117110000_require_atomic_owner_membership_changes.sql`. The hosted after-change owner-count trigger performs a count without locking the parent workspace. The hosted ownership-transfer RPC locks membership rows in deterministic order, but the missing hosted guard leaves a static concurrent owner-removal risk. This has not been reproduced with two live sessions.
+
+The development migration adds both the RLS exclusion and trigger-level rejection, and the local smoke test covers sequential direct-owner-delete denial and successful transfer. A two-session concurrent regression is still required before sign-off. Do not apply this migration to the live project in this workflow.
+
+### Migration reconciliation
+
+- Development branch: 15 migration files.
+- Main branch: 10 migration files.
+- Hosted migration history: 11 entries.
+- Development-only migrations: atomic owner-membership guard; membership-revocation Broadcast; anon helper EXECUTE revocation; anon application-table access revocation; public default-privilege restriction.
+- Hosted-only history name: `restrict_security_definer_function_execution` (version `20261116131735`); its exact SQL is not present in the repository. The current branch ACL migration is a reviewed reconciliation, not proof of byte-for-byte historical equivalence.
+
+### CI and acceptance boundary
+
+Branch head `22c23fcff1d1329b0a119c82d611686e9c4596e6` passed workflow [#45336401118](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45336401118), including all 15 development migrations against disposable PostgreSQL 17 and the application test/typecheck/build/Playwright job. The local harness explicitly uses Auth/Storage/Realtime stand-ins; it does not verify managed PostgREST, Auth, Storage API, WebSocket delivery, or two-session concurrency.
+
+**Milestone 2 remains OPEN.** No live schema/data/Auth/Storage changes, deployment, merge, secret change, or paid resource was performed.
