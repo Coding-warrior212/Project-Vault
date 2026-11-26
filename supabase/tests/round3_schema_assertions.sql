@@ -238,6 +238,16 @@ BEGIN
     RAISE EXCEPTION 'Unexpected authenticated SECURITY DEFINER execution grant on %', v_bad;
   END IF;
 
+  IF NOT has_function_privilege('authenticated', 'public.create_workspace_atomic(text,text,text,text,uuid)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.transfer_workspace_ownership_atomic(text,uuid,text,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Authenticated users must retain the user-JWT workspace creation and ownership-transfer RPCs';
+  END IF;
+
+  IF has_function_privilege('service_role', 'public.create_workspace_atomic(text,text,text,text,uuid)', 'EXECUTE')
+     OR has_function_privilege('service_role', 'public.transfer_workspace_ownership_atomic(text,uuid,text,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Service role must not execute workspace owner RPCs that accept caller-supplied actor IDs';
+  END IF;
+
   SELECT p.proname INTO v_bad
   FROM pg_proc p
   JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -247,14 +257,12 @@ BEGIN
     AND p.proname NOT IN (
       'broadcast_workspace_delete',
       'change_workspace_member_role_atomic',
-      'create_workspace_atomic',
       'get_workspace_role',
       'has_workspace_role',
       'is_authenticated_non_demo',
       'is_demo_workspace',
       'is_workspace_member',
-      'redeem_workspace_invite_by_hash_atomic',
-      'transfer_workspace_ownership_atomic'
+      'redeem_workspace_invite_by_hash_atomic'
     )
   LIMIT 1;
   IF v_bad IS NOT NULL THEN
