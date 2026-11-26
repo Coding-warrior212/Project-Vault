@@ -1,6 +1,6 @@
 # ProjectVault Round 3 — Supabase Compatibility Findings
 
-**Reviewed:** 2026-11-25 (latest hosted audit; earlier dated sections are historical)  
+**Reviewed:** 2026-11-26 (latest hosted audit; earlier dated sections are historical)  
 **Branch:** `round3-development`  
 **Status:** Review notes — do not apply migration to the hosted project.
 
@@ -604,3 +604,56 @@ The development migration adds both the RLS exclusion and trigger-level rejectio
 Branch head `22c23fcff1d1329b0a119c82d611686e9c4596e6` passed workflow [#45336401118](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45336401118), including all 15 development migrations against disposable PostgreSQL 17 and the application test/typecheck/build/Playwright job. The local harness explicitly uses Auth/Storage/Realtime stand-ins; it does not verify managed PostgREST, Auth, Storage API, WebSocket delivery, or two-session concurrency.
 
 **Milestone 2 remains OPEN.** No live schema/data/Auth/Storage changes, deployment, merge, secret change, or paid resource was performed.
+
+
+## 2026-11-26 review — hosted owner guard and service-role actor boundary
+
+### Fresh connected project status
+
+Read-only project metadata confirms project `asjxqshuvepjsqzttafc` is `ACTIVE_HEALTHY`, PostgreSQL `17.11.0.019`, region `ap-northeast-2`.
+
+Read-only catalog checks confirm:
+
+- 14 public application tables; RLS enabled on 14/14; 56 public policies.
+- `private.operation_capabilities` exists with RLS enabled and no policies. API roles have no `USAGE` on `private` and no table access to the capability table.
+- Hosted migration history remains 11 entries; the hosted-only `restrict_security_definer_function_execution` version `20261116131735` has no corresponding SQL file in either branch.
+- `anon` retains SELECT privilege on all 14 public application tables; anon EXECUTE on public SECURITY DEFINER functions is zero.
+- Public SECURITY DEFINER EXECUTE counts remain authenticated=9 and service_role=10.
+- Postgres-owned `public` default ACLs still grant anon/authenticated/service_role privileges on future tables, sequences, and functions.
+- The private `projectvault-sources` bucket remains private, capped at 50 MiB, and allows PDF, Markdown, plain text, and octet-stream.
+- `supabase_realtime` currently publishes 11 public tables. The development membership-revocation Broadcast migration is not in hosted history.
+
+### Confirmed hosted owner-membership mismatch
+
+The current hosted `workspace_members_delete_policy` is granted to `authenticated` and its USING expression does **not** exclude `role = 'owner'`. It permits self-removal and owner/admin-driven removal paths. The installed `public.enforce_workspace_member_guards()` does not contain the development-only `OWNER_DELETE_REQUIRES_TRANSFER` check.
+
+The hosted AFTER-trigger owner-count function counts remaining owners but does not lock the parent workspace or otherwise serialize distinct concurrent owner deletions. The ownership-transfer RPC locks membership rows deterministically, but this does not close the separate direct-delete path. This is a static concurrency/access-control risk; no two-session race was run against the live project.
+
+Development migration `20261117110000_require_atomic_owner_membership_changes.sql` already adds the owner-row RLS exclusion and trigger-level guard. It remains development-only and has not been applied to the connected project.
+
+### New least-privilege fix: remove unnecessary service-role access to user-actor RPCs
+
+A branch review found that `create_workspace_atomic(..., p_owner_id)` and `transfer_workspace_ownership_atomic(..., p_acting_owner_id)` contain service-role branches that trust the supplied actor ID. The current application calls workspace creation from `AuthGate` using the user's authenticated browser client and passes `p_owner_id: null`; `SettingsPage` has no ownership-transfer UI, and no inspected Express route calls either RPC. The separate invite-redemption service route validates the bearer session with Supabase Auth and derives the user ID server-side.
+
+To follow the trusted-actor design and remove unused privilege, development now includes:
+
+- `supabase/migrations/20261126110000_revoke_service_role_workspace_owner_rpcs.sql` — revokes `service_role` EXECUTE on workspace creation and ownership-transfer RPCs while preserving authenticated execution.
+- `supabase/tests/round3_schema_assertions.sql` — asserts authenticated execution remains and service_role execution is denied for both actor-ID RPCs.
+
+This does not change the connected project. It also does not replace the need for an authenticated owner-transfer UI/managed concurrency acceptance test.
+
+### Gemini authorization status corrected
+
+The earlier historical finding that Gemini extraction/conflict endpoints were unauthenticated is superseded by the current branch code. Both `server.ts` routes call `authorizeGeminiWorkspace`; `server/geminiAuth.ts` validates the bearer token with Supabase Auth `getUser`, rejects anonymous users, queries membership with the user's JWT (therefore RLS), and enforces route-specific role allowlists. The browser supplies identifiers rather than arbitrary document/claim content.
+
+The current `server/geminiAuth.test.ts` tests the non-anonymous user-shape helper only; it does not yet exercise the complete Auth API + membership-query boundary. Managed Auth configuration and end-to-end role-negative tests remain open. Do not continue reporting the endpoints as unauthenticated in current-branch status; report them as code-gated with managed verification pending.
+
+### Current verification and disposition
+
+- Development branch head: `38f57d0687c9d48e81f9395223aed1d17b174c32`.
+- Branch comparison: 299 ahead / 3 behind `main`; merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`; branch protection remains disabled.
+- Migration files: 16 development / 10 main / 11 hosted migration records.
+- GitHub Actions run [#45763275149](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45763275149) passed both jobs on the current head. PostgreSQL 17 applied all 16 development migrations and passed schema assertions/adversarial smoke tests; server tests, TypeScript, production build, Chromium setup, and Playwright E2E passed.
+- Security Advisor: 9 authenticated SECURITY DEFINER warnings, 1 leaked-password-protection warning (free-tier limitation; no upgrade), and 1 informational finding for the inaccessible private capability table. Performance Advisor: 15 unindexed foreign keys and 9 unused indexes. Health Advisor: no lints.
+
+**Milestone 2 remains OPEN — no managed Supabase compatibility/security sign-off.** Hosted ACL/default-privilege drift, hosted owner guard, exact migration-history reconciliation, PostgREST transaction-bound capability behavior, all-role/tenant isolation, invite concurrency, Storage API lifecycle, real Realtime revocation, and two-session owner concurrency remain unverified. No hosted migration, DDL/DML, Auth/Storage configuration change, secret change, deployment, merge, or paid resource was used.
