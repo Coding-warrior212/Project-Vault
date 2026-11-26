@@ -322,3 +322,32 @@ The branch remains diverged from `main`; Milestone 2 remains **OPEN — no manag
 - Confirmed live owner-removal mismatch: hosted member DELETE policy lacks `role <> 'owner'`; hosted member trigger lacks `OWNER_DELETE_REQUIRES_TRANSFER`. Development migration `20261117110000_require_atomic_owner_membership_changes.sql` contains both protections, but has not been applied to hosted Supabase. A two-session race test remains missing.
 - Current Advisors: Security 9 authenticated SECURITY DEFINER warnings, 1 leaked-password warning, 1 informational private capability-table finding; Performance 15 unindexed FKs and 9 unused indexes; Health no lints.
 - Milestone 2 remains OPEN. CI is local/disposable evidence only, not managed Supabase sign-off. No live schema/data/Auth/Storage change, deployment, merge, secret change, or paid resource was performed.
+
+
+## 2026-11-26 engineering follow-up — actor RPC privilege and current verification
+
+### Verified current branch
+
+- `round3-development` code head `38f57d0687c9d48e81f9395223aed1d17b174c32`; 299 ahead / 3 behind `main`; merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`; branch protection disabled.
+- GitHub Actions [#45763275149](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45763275149) passed both jobs. The disposable PostgreSQL 17 job applied all 16 migrations and passed schema assertions/adversarial smoke tests. Server security tests, TypeScript, production build, Chromium setup and Playwright E2E passed.
+- Development commits `6a8108a` and `38f57d0` add a least-privilege migration and regression assertions for service-role actor-ID RPCs.
+
+### Service-role actor-ID finding and mitigation
+
+`create_workspace_atomic(..., p_owner_id)` and `transfer_workspace_ownership_atomic(..., p_acting_owner_id)` contain service-role branches that use supplied actor IDs. The inspected browser path calls workspace creation with the authenticated user client and `p_owner_id: null`; SettingsPage contains no ownership-transfer UI and no inspected Express route invokes either RPC. The separate invite-redemption route is different: it validates the bearer session with Supabase Auth and derives the user ID server-side.
+
+Development migration `20261126110000_revoke_service_role_workspace_owner_rpcs.sql` revokes service_role EXECUTE on the two actor-ID RPCs. Schema assertions require authenticated execution to remain and service_role execution to be absent. The new migration and assertions passed the disposable PostgreSQL 17 CI job. The connected project still has the old grants; no hosted change was made.
+
+### Supabase and application security status
+
+- Fresh hosted read-only checks on 2026-11-26 confirm 14 public tables with RLS 14/14, 56 policies, 11 migration records, private capability schema inaccessible to API roles, and 11 Realtime publication tables.
+- Hosted anon SELECT remains on 14/14 application tables; postgres-owned public default ACLs remain broad. Hosted membership DELETE policy still lacks the owner exclusion, and hosted membership trigger lacks `OWNER_DELETE_REQUIRES_TRANSFER`. Owner concurrency is a static risk not reproduced with two live sessions.
+- Hosted Security Advisor: 9 authenticated SECURITY DEFINER warnings, 1 leaked-password warning (free-tier limitation; do not upgrade), 1 private-table informational finding. Performance: 15 unindexed foreign keys and 9 unused indexes. Health: no lints.
+- Current branch Gemini routes are no longer unauthenticated: `server.ts` calls `authorizeGeminiWorkspace` for extraction and conflict analysis; the helper validates Supabase Auth user, rejects anonymous sessions, checks membership under the user's JWT/RLS, and enforces role allowlists. Existing unit tests only exercise the non-anonymous user-shape helper, so full Auth/membership integration tests and managed verification remain.
+- The development membership-revocation Broadcast migration is not hosted; actual Storage API lifecycle, WebSocket delivery, PostgREST transaction-bound capability behavior and two-session owner concurrency remain unverified.
+
+### Milestone disposition
+
+M1 remains in progress due to branch divergence and disabled protection. M2 remains **OPEN — not signed off**. M3 has Auth/RBAC implementation but live provider/email/invite/role acceptance remains. M4 has cloud persistence/Storage/Realtime code but managed service acceptance remains. M5 has public GitHub manual snapshots and a derived evidence graph; private GitHub OAuth/background sync and automated change-impact propagation are not delivered. M6 browser-local interactive Judge Demo isolation remains verified. M7 current CI is green but managed tests remain. M8 is not ready; Render read-only status has not been refreshed since 2026-11-21 because workspace confirmation is required.
+
+No hosted schema/data/Auth/Storage change, secret change, merge, deployment, or paid resource was performed.
