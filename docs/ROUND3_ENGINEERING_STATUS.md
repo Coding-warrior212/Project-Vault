@@ -328,7 +328,7 @@ The branch remains diverged from `main`; Milestone 2 remains **OPEN — no manag
 
 ### Verified current branch
 
-- Current `round3-development` head `0c521a352937cb02e300df37c3e54dbecda07d7f` (documentation-only follow-ups); 302 ahead / 3 behind `main`; merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`. The latest code-bearing head `38f57d0` passed run #45763275149. Branch protection disabled.
+- The current branch includes documentation-only audit follow-ups after code-bearing head `38f57d0`, which passed run #45763275149. The branch remains diverged from `main`; merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`. Use the live branch page for exact moving commit counts. Branch protection disabled.
 - GitHub Actions [#45763275149](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45763275149) passed both jobs. The disposable PostgreSQL 17 job applied all 16 migrations and passed schema assertions/adversarial smoke tests. Server security tests, TypeScript, production build, Chromium setup and Playwright E2E passed.
 - Development commits `6a8108a` and `38f57d0` add a least-privilege migration and regression assertions for service-role actor-ID RPCs.
 

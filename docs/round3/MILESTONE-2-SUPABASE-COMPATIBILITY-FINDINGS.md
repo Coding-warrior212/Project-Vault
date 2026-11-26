@@ -650,8 +650,8 @@ The current `server/geminiAuth.test.ts` tests the non-anonymous user-shape helpe
 
 ### Current verification and disposition
 
-- Current development branch head: `0c521a352937cb02e300df37c3e54dbecda07d7f` (documentation-only follow-ups after the code-bearing commit). The latest code-bearing head `38f57d0687c9d48e81f9395223aed1d17b174c32` passed run #45763275149.
-- Branch comparison: 302 ahead / 3 behind `main`; merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`; branch protection remains disabled.
+- The current branch includes documentation-only audit follow-ups after code-bearing head `38f57d0687c9d48e81f9395223aed1d17b174c32`, which passed run #45763275149.
+- The branch remains diverged from `main`; merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`; branch protection remains disabled. Use the live branch page for exact moving commit counts.
 - Migration files: 16 development / 10 main / 11 hosted migration records.
 - GitHub Actions run [#45763275149](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45763275149) passed both jobs on the current head. PostgreSQL 17 applied all 16 development migrations and passed schema assertions/adversarial smoke tests; server tests, TypeScript, production build, Chromium setup, and Playwright E2E passed.
 - Security Advisor: 9 authenticated SECURITY DEFINER warnings, 1 leaked-password-protection warning (free-tier limitation; no upgrade), and 1 informational finding for the inaccessible private capability table. Performance Advisor: 15 unindexed foreign keys and 9 unused indexes. Health Advisor: no lints.
