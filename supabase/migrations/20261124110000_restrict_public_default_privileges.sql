@@ -18,8 +18,14 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   REVOKE ALL ON SEQUENCES FROM PUBLIC, anon, authenticated, service_role;
 
+-- PostgreSQL grants EXECUTE on new functions to PUBLIC globally by default.
+-- A schema-scoped REVOKE cannot cancel that global default, so revoke it globally.
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+
+-- Supabase's API-role defaults are schema-scoped, so revoke those in public.
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
-  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated, service_role;
+  REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated, service_role;
 
 -- Match the hosted SECURITY DEFINER execution boundary. Trigger/internal
 -- functions remain inaccessible to API roles; only the reviewed helper/RPC

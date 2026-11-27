@@ -214,6 +214,21 @@ BEGIN
     RAISE EXCEPTION 'Postgres public default ACLs must not grant tables, sequences, or functions to API roles';
   END IF;
 
+  -- PostgreSQL's default PUBLIC EXECUTE grant is global. A per-schema
+  -- REVOKE cannot cancel it, so assert the global postgres default is hardened.
+  IF EXISTS (
+    SELECT 1
+    FROM pg_default_acl d
+    CROSS JOIN LATERAL aclexplode(d.defaclacl) a
+    WHERE d.defaclrole = 'postgres'::regrole
+      AND d.defaclnamespace = 0
+      AND d.defaclobjtype = 'f'
+      AND a.grantee = 0
+      AND a.privilege_type = 'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'Postgres global function defaults must not grant EXECUTE to PUBLIC';
+  END IF;
+
   -- The hosted SECURITY DEFINER allowlist is intentional: internal trigger
   -- functions are not directly executable by API roles.
   SELECT p.proname INTO v_bad

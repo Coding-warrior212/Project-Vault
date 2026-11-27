@@ -109,3 +109,10 @@ The disposable bootstrap now seeds the Supabase-style default privileges granted
 Migration `20261124110000_restrict_public_default_privileges.sql` revokes inherited API-role defaults for future public tables, sequences, and functions. It also normalizes the existing public SECURITY DEFINER function ACLs to the reviewed helper/RPC allowlist. New public objects must receive explicit, narrowly scoped grants from their own migration.
 
 The migration and assertions are development-branch only. Do not apply them to hosted Supabase until the full migration-history reconciliation and Milestone 2 acceptance process is complete.
+
+
+## Global PUBLIC function-default regression
+
+PostgreSQL grants EXECUTE on newly created functions to PUBLIC by default. A schema-scoped `ALTER DEFAULT PRIVILEGES ... IN SCHEMA public REVOKE EXECUTE ... FROM PUBLIC` cannot remove that global default; PostgreSQL documents that per-schema defaults are additive and cannot revoke global privileges. The hardening migration therefore revokes function EXECUTE from PUBLIC globally for objects created by `postgres`, then separately revokes the Supabase API-role defaults in `public`. The disposable bootstrap explicitly seeds the global PUBLIC grant, and `round3_schema_assertions.sql` fails if it remains.
+
+Reference: https://www.postgresql.org/docs/current/sql-alterdefaultprivileges.html

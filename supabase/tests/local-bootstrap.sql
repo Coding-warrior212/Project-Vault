@@ -8,6 +8,10 @@ DO $$ BEGIN CREATE ROLE service_role NOLOGIN BYPASSRLS; EXCEPTION WHEN duplicate
 -- Emulate the Supabase-managed default ACLs for objects created by the
 -- postgres migration owner in public. The hardening migration must revoke
 -- these inherited API-role grants; otherwise the local test would be vacuous.
+-- PostgreSQL's built-in global function default grants EXECUTE to PUBLIC.
+-- Seed it explicitly so the regression test proves the global revoke works.
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres
+  GRANT EXECUTE ON FUNCTIONS TO PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
