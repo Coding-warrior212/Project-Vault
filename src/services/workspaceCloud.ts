@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import type { ActivityEvent, KnowledgeClaim, MissingInfoFinding, ProjectConflict, Source, UnresolvedQuestion } from '../types';
+import { assertAffectedRows } from './cloudMutation';
 
 function client() {
   if (!supabase) throw new Error('Supabase is not configured.');
@@ -153,11 +154,7 @@ export async function updateWorkspaceClaimFlag(
 
   if (error) throw error;
 
-  if (!data?.length) {
-    throw new Error(
-      'Claim was not updated. It may not exist in this workspace or your role may not have permission.'
-    );
-  }
+  assertAffectedRows(data, 'Claim was not updated. It may not exist in this workspace or your role may not have permission.');
 }
 
 export async function saveWorkspaceConflicts(workspaceId: string, items: ProjectConflict[]) {
@@ -279,9 +276,10 @@ export async function saveWorkspaceHandover(workspaceId: string, draft: {
     checklist:draft.checklist,is_approved:draft.isApproved,approved_by:draft.isApproved?draft.approvedBy:null,
     approved_by_user_id:draft.isApproved?user.id:null,approved_at:draft.isApproved?new Date().toISOString():null};
   const result=existing
-    ? await db.from('handovers').update(payload).eq('workspace_id',ws).eq('id',existing.id)
-    : await db.from('handovers').insert(payload);
+    ? await db.from('handovers').update(payload).eq('workspace_id',ws).eq('id',existing.id).select('id')
+    : await db.from('handovers').insert(payload).select('id');
   if(result.error)throw result.error;
+  assertAffectedRows(result.data, 'Shared handover was not saved. It may no longer exist or your role may not have permission.');
   if(draft.isApproved) await appendWorkspaceActivity(ws,{id:'act-'+crypto.randomUUID(),type:'handover_approved',
     timestamp:'Just now',title:'Handover approved',description:'Human reviewer approved the workspace handover dossier.',
     actor:draft.approvedBy});
@@ -313,5 +311,5 @@ export async function updateWorkspaceClaim(workspaceId: string, claim: Knowledge
     flagged_by:claim.flaggedBy ?? null,flag_reason:claim.flagReason ?? null,
   }).eq('workspace_id',ws).eq('id',claim.id).select('id');
   if(error)throw error;
-  if(!data?.length)throw new Error('Claim was not updated. It may not exist in this workspace or your role may not have permission.');
+  assertAffectedRows(data, 'Claim was not updated. It may not exist in this workspace or your role may not have permission.');
 }
