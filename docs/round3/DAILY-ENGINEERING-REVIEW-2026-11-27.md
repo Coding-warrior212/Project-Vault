@@ -7,11 +7,11 @@
 
 ## Executive result
 
-- The current branch head is `d3629e71e546cd87b305f4626a813659ea9e1e96` (documentation-only commit).
+- At the initial audit snapshot, the branch head was `d3629e71e546cd87b305f4626a813659ea9e1e96` (documentation-only commit). After the follow-up fixes below, the branch head is `5dfaf65c9f372af96b8932cc3627b0db0a652f91`.
 - The current head's GitHub Actions run [#45764307863](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45764307863) completed successfully: both the PostgreSQL 17 migration/adversarial job and application tests/typecheck/build job passed.
 - The latest code-bearing snapshot identified in the milestone tracker, `38f57d0687c9d48e81f9395223aed1d17b174c32`, also passed both jobs in [#45763275149](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45763275149).
 - The branch contains 16 SQL migration files. The connected hosted project records 11 migrations.
-- Comparing `round3-development` to `main`: **306 ahead, 3 behind**, merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`. GitHub reports the branch as diverged; branch protection is disabled.
+- Comparing `round3-development` to `main` at the final review snapshot: **309 ahead, 3 behind**, merge base `67cd33b0a003c7590c12f5d18a5b2a316167a1ea`. GitHub reports the branch as diverged; branch protection is disabled.
 - **Milestone 2 remains open. No milestone is declared fully complete.**
 
 ## Fresh connected Supabase read-only verification
@@ -96,3 +96,25 @@ The two verified CI runs above establish disposable PostgreSQL 17 migration/sche
 ## Safety record
 
 Only GitHub reads, Supabase project/catalog reads, migration inventory, and Advisor reads were performed. No Supabase schema/data/Auth/Storage changes, migrations, deployments, merges, secret changes, or paid resources were used.
+
+
+## Follow-up fixes committed during the 2026-11-27 review
+
+### Global PUBLIC function defaults — commit `bbb795390505fef5859934b069f226b0af41c463`
+
+A second-pass review found that the original hardening migration attempted to revoke PostgreSQL's built-in PUBLIC function EXECUTE default using `IN SCHEMA public`. PostgreSQL documents that per-schema default ACLs are additive and cannot revoke global defaults. The migration now revokes function EXECUTE from PUBLIC globally for objects created by `postgres`, then separately revokes Supabase's schema-scoped API-role defaults. The disposable bootstrap explicitly seeds the global PUBLIC grant and the schema assertions fail if it remains. The local PostgreSQL 17 database job passed in [run #45949103949](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45949103949).
+
+Reference: https://www.postgresql.org/docs/current/sql-alterdefaultprivileges.html
+
+### Cloud handover zero-row update — commit `5dfaf65c9f372af96b8932cc3627b0db0a652f91`
+
+A static cloud-adapter review found that `saveWorkspaceHandover` updated an existing row without requesting returned IDs. PostgREST can report no transport/database error while an RLS-filtered update affects zero rows; the UI could then mark the handover approved even though it was not persisted. The save now requests `select('id')` for both insert and update paths and fails closed on an empty result. A shared `assertAffectedRows` helper now covers both claim update paths too, with unit tests included in `npm run test:server`.
+
+The complete CI run [#45949356716](https://github.com/Coding-warrior212/Project-Vault/actions/runs/45949356716) passed both the application job (server tests including the new unit test, TypeScript, production build, Playwright E2E) and the disposable PostgreSQL 17 migration/adversarial job.
+
+### Final branch snapshot
+
+- Head: `5dfaf65c9f372af96b8932cc3627b0db0a652f91`
+- Ahead/behind: 309 ahead, 3 behind `main`; still diverged.
+- Branch protection remains disabled.
+- Milestone 2 remains open; no hosted migration was applied.
