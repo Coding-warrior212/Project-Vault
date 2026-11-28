@@ -13,6 +13,22 @@ test('rejects a zero-row mutation even when PostgREST returned no error', () => 
   );
 });
 
+
+test('accepts a batch mutation when every expected row is returned', () => {
+  assert.doesNotThrow(() => assertAffectedRows(
+    [{ id: 'row-1' }, { id: 'row-2' }],
+    'not all rows saved',
+    2,
+  ));
+});
+
+test('rejects a partially applied batch mutation', () => {
+  assert.throws(
+    () => assertAffectedRows([{ id: 'row-1' }], 'Not all records were saved.', 2),
+    { message: 'Not all records were saved.' },
+  );
+});
+
 test('rejects missing mutation data', () => {
   assert.throws(
     () => assertAffectedRows(null, 'Claim was not updated.'),
