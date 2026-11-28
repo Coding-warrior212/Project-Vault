@@ -2,6 +2,7 @@
 export function assertAffectedRows<T>(
   rows: readonly T[] | null | undefined,
   message: string,
+  expectedCount = 1,
 ): asserts rows is readonly T[] {
-  if (!rows?.length) throw new Error(message);
+  if (!rows || rows.length !== expectedCount) throw new Error(message);
 }
