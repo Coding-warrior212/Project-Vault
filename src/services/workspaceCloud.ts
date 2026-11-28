@@ -80,7 +80,7 @@ export async function loadWorkspaceData(workspaceId: string): Promise<CloudWorks
 
 export async function saveWorkspaceSource(workspaceId: string, source: Source) {
   const ws = requiredWorkspace(workspaceId);
-  const { error } = await client().from('sources').upsert({
+  const { data, error } = await client().from('sources').upsert({
     id:source.id,workspace_id:ws,title:source.title,type:source.type,filename:source.filename,
     size_display:source.size,size_bytes:source.sizeBytes ?? null,ingested_at_label:source.ingestedAt,
     claims_count:source.claimsCount,status:source.status,extraction_status:source.extractionStatus ?? 'pending',
@@ -90,8 +90,9 @@ export async function saveWorkspaceSource(workspaceId: string, source: Source) {
     char_count:source.charCount ?? null,word_count:source.wordCount ?? null,error_message:source.errorMessage ?? null,
     content_hash:source.contentHash ?? null,is_user_uploaded:source.isUserUploaded ?? false,
     mime_type:source.mimeType ?? null,tags:source.tags ?? [],
-  }, { onConflict:'id' });
+  }, { onConflict:'id' }).select('id');
   if (error) throw error;
+  assertAffectedRows(data, 'Source was not saved. It may not exist in this workspace or your role may not have permission.');
 }
 
 export async function saveWorkspaceClaims(workspaceId: string, claims: KnowledgeClaim[]) {
@@ -163,21 +164,27 @@ export async function saveWorkspaceConflicts(workspaceId: string, items: Project
     related_claim_ids:x.relatedClaimIds,supporting_evidence:x.supportingEvidence,source_references:x.sourceReferences,
     severity:x.severity,status:x.status,resolved_note:x.resolvedNote ?? null,is_ai_detected:x.isAiDetected ?? false,
     detected_at:iso(x.detectedAt)}));
-  const {error}=await client().from('conflicts').upsert(rows,{onConflict:'id'}); if(error)throw error;
+  const {data,error}=await client().from('conflicts').upsert(rows,{onConflict:'id'}).select('id');
+  if(error)throw error;
+  assertAffectedRows(data, 'Not all conflict updates were saved. Check workspace access and permissions.', rows.length);
 }
 export async function saveWorkspaceMissingInfo(workspaceId: string, items: MissingInfoFinding[]) {
   const ws=requiredWorkspace(workspaceId); if(!items.length)return;
   const rows=items.map(x=>({id:x.id,workspace_id:ws,category:x.category,title:x.title,description:x.description,
     why_it_matters:x.whyItMatters,supporting_claim_ids:x.supportingClaimIds ?? [],severity:x.severity,
     status:x.status,action_suggestion:x.actionSuggestion ?? null}));
-  const {error}=await client().from('missing_info').upsert(rows,{onConflict:'id'}); if(error)throw error;
+  const {data,error}=await client().from('missing_info').upsert(rows,{onConflict:'id'}).select('id');
+  if(error)throw error;
+  assertAffectedRows(data, 'Not all missing-information updates were saved. Check workspace access and permissions.', rows.length);
 }
 export async function saveWorkspaceQuestions(workspaceId: string, items: UnresolvedQuestion[]) {
   const ws=requiredWorkspace(workspaceId); if(!items.length)return;
   const rows=items.map(x=>({id:x.id,workspace_id:ws,question:x.question,context:x.context,
     related_claim_ids:x.relatedClaimIds ?? [],status:x.status,answer:x.answer ?? null,
     answered_by:x.answeredBy ?? null,answered_at:x.answeredAt ?? null}));
-  const {error}=await client().from('questions').upsert(rows,{onConflict:'id'}); if(error)throw error;
+  const {data,error}=await client().from('questions').upsert(rows,{onConflict:'id'}).select('id');
+  if(error)throw error;
+  assertAffectedRows(data, 'Not all question updates were saved. Check workspace access and permissions.', rows.length);
 }
 export async function appendWorkspaceActivity(workspaceId: string, event: ActivityEvent) {
   const ws=requiredWorkspace(workspaceId);
